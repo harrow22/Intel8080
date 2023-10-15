@@ -17,26 +17,26 @@ constexpr int mnemonic[72] {
         79, // LDAX rp
         83, // STAX rp
         87, // XCHG
-        0, // ADD r
-        0, // ADD M
-        0, // ADI data
-        0, // ADC r
-        0, // ADC M
-        0, // ACI data
-        0, // SUB r
-        0, // SUB M
-        0, // SUI data
-        0, // SBB r
-        0, // SBB M
-        0, // SBI data
-        0, // INR r
-        0, // INR M
-        0, // DCR r
-        0, // DCR M
-        0, // INX rp
-        0, // DCX rp
-        0, // DAD rp
-        0, // DAA
+        88, // ADD r
+        89, // ADD M
+        93, // ADI data
+        97, // ADC r
+        98, // ADC M
+        103, // ACI data
+        107, // SUB r
+        108, // SUB M
+        112, // SUI data
+        116, // SBB r
+        117, // SBB M
+        121, // SBI data
+        125, // INR r
+        127, // INR M
+        134, // DCR r
+        136, // DCR M
+        143, // INX rp
+        145, // DCX rp
+        147, // DAD rp
+        154, // DAA
         0, // ANA r
         0, // ANA M
         0, // ANI data
@@ -122,15 +122,15 @@ void Intel8080::tick()
                 break;
             }
 
-            // MOV r1, r2
+        // MOV r1, r2
         case 3: goto next;
         case 4:
             reg_[dst_()] = reg_[src_()];
             goto done;
 
-            // MOV r, M
+        // MOV r, M
         case 5:
-            readT1_(pair_(HL));
+            readT1_(getPair_(HL));
             goto next;
         case 6:
             readT2_();
@@ -143,9 +143,9 @@ void Intel8080::tick()
                 goto done;
             }
 
-            // MOV M, r
+        // MOV M, r
         case 8:
-            writeT1_(pair_(HL));
+            writeT1_(getPair_(HL));
             goto next;
         case 9:
             writeT2_(reg_[dst_()]);
@@ -157,13 +157,13 @@ void Intel8080::tick()
                 goto done;
             }
 
-            // SPHL
+        // SPHL
         case 11: goto next;
         case 12:
-            sp_ = pair_(HL);
+            sp_ = getPair_(HL);
             goto done;
 
-            // MVI r, data
+        // MVI r, data
         case 13: goto next;
         case 14:
             readT1_(pc_);
@@ -179,7 +179,7 @@ void Intel8080::tick()
                 goto done;
             }
 
-            // MVI M, data
+        // MVI M, data
         case 18: goto next;
         case 19:
             readT1_(pc_);
@@ -195,7 +195,7 @@ void Intel8080::tick()
                 goto next;
             }
         case 22:
-            writeT1_(pair_(HL));
+            writeT1_(getPair_(HL));
             goto next;
         case 23:
             writeT2_(tmp_);
@@ -207,7 +207,7 @@ void Intel8080::tick()
                 goto done;
             }
 
-            // LXI rp, data
+        // LXI rp, data
         case 25: goto next;
         case 26:
             readT1_(pc_);
@@ -269,7 +269,7 @@ void Intel8080::tick()
                 goto next;
             }
         case 39:
-            readT1_(pair_(WZ));
+            readT1_(getPair_(WZ));
             goto next;
         case 40:
             readT2_();
@@ -314,7 +314,7 @@ void Intel8080::tick()
                 goto next;
             }
         case 49:
-            writeT1_(pair_(W));
+            writeT1_(getPair_(W));
             goto next;
         case 50:
             writeT2_(reg_[A]);
@@ -357,7 +357,7 @@ void Intel8080::tick()
                 goto next;
             }
         case 60:
-            readT1_(pair_(WZ) + 1U);
+            readT1_(getPair_(WZ) + 1U);
             goto next;
         case 61:
             readT2_();
@@ -370,7 +370,7 @@ void Intel8080::tick()
                 goto next;
             }
         case 63:
-            readT1_(pair_(WZ));
+            readT1_(getPair_(WZ));
             goto next;
         case 64:
             readT2_();
@@ -414,7 +414,7 @@ void Intel8080::tick()
                 goto next;
             }
         case 73:
-            writeT1_(pair_(WZ) + 1U);
+            writeT1_(getPair_(WZ) + 1U);
             goto next;
         case 74:
             writeT2_(reg_[L]);
@@ -426,7 +426,7 @@ void Intel8080::tick()
                 goto next;
             }
         case 76:
-            writeT1_(pair_(WZ));
+            writeT1_(getPair_(WZ));
             goto next;
         case 77:
             writeT2_(reg_[H]);
@@ -441,7 +441,7 @@ void Intel8080::tick()
         // LDAX rp
         case 79: goto next;
         case 80:
-            readT1_(pair_(rp_()));
+            readT1_(getPair_(rp_()));
             goto next;
         case 81:
             readT2_();
@@ -457,7 +457,7 @@ void Intel8080::tick()
         // STAX rp
         case 83: goto next;
         case 84:
-            writeT1_(pair_(rp_()));
+            writeT1_(getPair_(rp_()));
             goto next;
         case 85:
             writeT2_(reg_[A]);
@@ -473,6 +473,267 @@ void Intel8080::tick()
         case 87:
             std::swap(reg_[H], reg_[D]);
             std::swap(reg_[L], reg_[E]);
+            goto done;
+
+        // my emulator cheats in this group by not overlapping the arithmetic instructions with the next fetch/decode cycle
+        // ADD r
+        case 88:
+            add(reg_[src_()]);
+            goto done;
+
+        // ADD M
+        case 89: goto next;
+        case 90:
+            readT1_(getPair_(HL));
+            goto next;
+        case 91:
+            readT2_();
+            goto next;
+        case 92:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                add(tmp_);
+                goto done;
+            }
+
+        // ADI data
+        case 93: goto next;
+        case 94:
+            readT1_(pc_);
+            goto next;
+        case 95:
+            readT2_();
+            ++pc_;
+            goto next;
+        case 96:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                add(tmp_);
+                goto done;
+            }
+
+        // ADC r
+        case 97:
+            add(reg_[src_()] + reg_[F] & carryBit); // TODO: does this work or do i need to pass both?
+            goto done;
+
+        // ADC M
+        case 98: goto next;
+        case 99:
+            readT1_(getPair_(HL));
+            goto next;
+        case 101:
+            readT2_();
+            goto next;
+        case 102:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                add(tmp_ + reg_[F] & carryBit);
+                goto done;
+            }
+
+        // ACI data
+        case 103: goto next;
+        case 104:
+            readT1_(pc_);
+            goto next;
+        case 105:
+            readT2_();
+            ++pc_;
+            goto next;
+        case 106:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                add(tmp_ + reg_[F] & carryBit);
+                goto done;
+            }
+
+        // SUB r
+        case 107:
+            sub(reg_[src_()]);
+            goto done;
+
+        // SUB M
+        case 108: goto next;
+        case 109:
+            readT1_(getPair_(HL));
+            goto next;
+        case 110:
+            readT2_();
+            goto next;
+        case 111:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                sub(tmp_);
+                goto done;
+            }
+
+        // SUI data
+        case 112: goto next;
+        case 113:
+            readT1_(pc_);
+            goto next;
+        case 114:
+            readT2_();
+            ++pc_;
+            goto next;
+        case 115:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                sub(tmp_);
+                goto done;
+            }
+
+        // SBB r
+        case 116:
+            sub(reg_[src_()] - reg_[F] & carryBit);
+            goto done;
+
+        // SBB M
+        case 117: goto next;
+        case 118:
+            readT1_(getPair_(HL));
+            goto next;
+        case 119:
+            readT2_();
+            goto next;
+        case 120:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                add(tmp_ - reg_[F] & carryBit);
+                goto done;
+            }
+
+        // SBI data
+        case 121: goto next;
+        case 122:
+            readT1_(pc_);
+            goto next;
+        case 123:
+            readT2_();
+            ++pc_;
+            goto next;
+        case 124:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                add(tmp_ - reg_[F] & carryBit);
+                goto done;
+            }
+
+        // INR r
+        case 125: goto next;
+        case 126:
+            inr(reg_[dst_()]);
+            goto done;
+
+        // INR M
+        case 127: goto next;
+        case 128:
+            readT1_(getPair_(HL));
+            goto next;
+        case 129:
+            readT2_();
+            goto next;
+        case 130:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                inr(tmp_);
+                goto next;
+            }
+        case 131:
+            writeT1_(getPair_(HL));
+            goto next;
+        case 132:
+            writeT2_(tmp_);
+            goto next;
+        case 133:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                goto done;
+            }
+
+        // DCR r
+        case 134: goto next;
+        case 135:
+            dcr(reg_[dst_()]);
+            goto done;
+
+        // DCR M
+        case 136: goto next;
+        case 137:
+            readT1_(getPair_(HL));
+            goto next;
+        case 138:
+            readT2_();
+            goto next;
+        case 139:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                dcr(tmp_);
+                goto next;
+            }
+        case 140:
+            writeT1_(getPair_(HL));
+            goto next;
+        case 141:
+            writeT2_(tmp_);
+            goto next;
+        case 142:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                goto done;
+            }
+
+        // INX rp
+        case 143: goto next;
+        case 144:
+            setPair_(rp_(), getPair_(rp_()) + 1U);
+            goto done;
+
+        // DCX rp
+        case 145: goto next;
+        case 146:
+            setPair_(rp_(), getPair_(rp_()) - 1U);
+            goto done;
+
+        // DAD (cheating by using integers)
+        case 147: case 148: case 149: case 150: case 151: case 152: goto next;
+        case 153: {
+            std::uint16_t hl = getPair_(HL);
+            std::uint16_t rp = getPair_(rp_());
+            setCarryFlag(hl + rp > 0xFFFF);
+            setPair_(HL, hl + rp);
+            goto done;
+        }
+
+        // DAA
+        case 154:
+            if ((reg_[A] & 0xF) > 9)
+                add(6U);
+            if ((reg_[A] & 0xF0) > 9 or reg_[F] & carryBit)
+                add(6U << 2U);
             goto done;
     }
 

@@ -85,40 +85,40 @@
 class Intel8080 {
 public:
     // pin bit constants
-    static constexpr std::uint_fast64_t A0 {1ULL << 0};
-    static constexpr std::uint_fast64_t A1 {1ULL << 1};
-    static constexpr std::uint_fast64_t A2 {1ULL << 2};
-    static constexpr std::uint_fast64_t A3 {1ULL << 4};
-    static constexpr std::uint_fast64_t A4 {1ULL << 5};
-    static constexpr std::uint_fast64_t A5 {1ULL << 6};
-    static constexpr std::uint_fast64_t A6 {1ULL << 7};
-    static constexpr std::uint_fast64_t A7 {1ULL << 8};
-    static constexpr std::uint_fast64_t A8 {1ULL << 9};
-    static constexpr std::uint_fast64_t A9 {1ULL << 10};
-    static constexpr std::uint_fast64_t A10 {1ULL << 11};
-    static constexpr std::uint_fast64_t A11 {1ULL << 12};
-    static constexpr std::uint_fast64_t A12 {1ULL << 13};
-    static constexpr std::uint_fast64_t A13 {1ULL << 14};
-    static constexpr std::uint_fast64_t A14 {1ULL << 15};
-    static constexpr std::uint_fast64_t A15 {1ULL << 16};
-    static constexpr std::uint_fast64_t INTA {1ULL << 17};
-    static constexpr std::uint_fast64_t WO {1ULL << 18};
-    static constexpr std::uint_fast64_t STACK {1ULL << 19};
-    static constexpr std::uint_fast64_t HLTA {1ULL << 20};
-    static constexpr std::uint_fast64_t OUT {1ULL << 21};
-    static constexpr std::uint_fast64_t M1 {1ULL << 22};
-    static constexpr std::uint_fast64_t INP {1ULL << 23};
-    static constexpr std::uint_fast64_t MEMR {1ULL << 24};
-    static constexpr std::uint_fast64_t INTE {1ULL << 25};
-    static constexpr std::uint_fast64_t DBIN {1ULL << 26};
-    static constexpr std::uint_fast64_t WR {1ULL << 27};
-    static constexpr std::uint_fast64_t SYNC {1ULL << 28};
-    static constexpr std::uint_fast64_t HLDA {1ULL << 29};
-    static constexpr std::uint_fast64_t WAIT {1ULL << 30};
-    static constexpr std::uint_fast64_t RESET {1ULL << 31};
-    static constexpr std::uint_fast64_t HOLD {1ULL << 32};
-    static constexpr std::uint_fast64_t INT {1ULL << 33};
-    static constexpr std::uint_fast64_t READY {1ULL << 34};
+    static constexpr std::uint_fast64_t A0 {1ULL << 0ULL};
+    static constexpr std::uint_fast64_t A1 {1ULL << 1ULL};
+    static constexpr std::uint_fast64_t A2 {1ULL << 2ULL};
+    static constexpr std::uint_fast64_t A3 {1ULL << 4ULL};
+    static constexpr std::uint_fast64_t A4 {1ULL << 5ULL};
+    static constexpr std::uint_fast64_t A5 {1ULL << 6ULL};
+    static constexpr std::uint_fast64_t A6 {1ULL << 7ULL};
+    static constexpr std::uint_fast64_t A7 {1ULL << 8ULL};
+    static constexpr std::uint_fast64_t A8 {1ULL << 9ULL};
+    static constexpr std::uint_fast64_t A9 {1ULL << 10ULL};
+    static constexpr std::uint_fast64_t A10 {1ULL << 11ULL};
+    static constexpr std::uint_fast64_t A11 {1ULL << 12ULL};
+    static constexpr std::uint_fast64_t A12 {1ULL << 13ULL};
+    static constexpr std::uint_fast64_t A13 {1ULL << 14ULL};
+    static constexpr std::uint_fast64_t A14 {1ULL << 15ULL};
+    static constexpr std::uint_fast64_t A15 {1ULL << 16ULL};
+    static constexpr std::uint_fast64_t INTA {1ULL << 17ULL};
+    static constexpr std::uint_fast64_t WO {1ULL << 18ULL};
+    static constexpr std::uint_fast64_t STACK {1ULL << 19ULL};
+    static constexpr std::uint_fast64_t HLTA {1ULL << 20ULL};
+    static constexpr std::uint_fast64_t OUT {1ULL << 21ULL};
+    static constexpr std::uint_fast64_t M1 {1ULL << 22ULL};
+    static constexpr std::uint_fast64_t INP {1ULL << 23ULL};
+    static constexpr std::uint_fast64_t MEMR {1ULL << 24ULL};
+    static constexpr std::uint_fast64_t INTE {1ULL << 25ULL};
+    static constexpr std::uint_fast64_t DBIN {1ULL << 26ULL};
+    static constexpr std::uint_fast64_t WR {1ULL << 27ULL};
+    static constexpr std::uint_fast64_t SYNC {1ULL << 28ULL};
+    static constexpr std::uint_fast64_t HLDA {1ULL << 29ULL};
+    static constexpr std::uint_fast64_t WAIT {1ULL << 30ULL};
+    static constexpr std::uint_fast64_t RESET {1ULL << 31ULL};
+    static constexpr std::uint_fast64_t HOLD {1ULL << 32ULL};
+    static constexpr std::uint_fast64_t INT {1ULL << 33ULL};
+    static constexpr std::uint_fast64_t READY {1ULL << 34ULL};
 
     // bus constants
     static constexpr std::uint_fast64_t abus {0xFFFFULL};
@@ -169,25 +169,56 @@ private:
             pins |= WAIT;
     };
     void fetch_() { pins |= SYNC; setDBus(WO|M1|MEMR); setABus(pc_); }
-    void readT1_(std::uint16_t addr) { pins |= SYNC; setDBus(WO|MEMR); setABus(addr); }
+    void readT1_(const std::uint16_t addr) { pins |= SYNC; setDBus(WO|MEMR); setABus(addr); }
     void readT2_() { t2_(); pins |= DBIN; }
-    void writeT1_(std::uint16_t addr) { pins |= SYNC; setDBus(0); setABus(addr); }
-    void writeT2_(std::uint8_t r) { t2_(); pins |= DBIN; setDBus(r); }
+    void writeT1_(const std::uint16_t addr) { pins |= SYNC; setDBus(0); setABus(addr); }
+    void writeT2_(const std::uint8_t r) { t2_(); pins |= DBIN; setDBus(r); }
     void stopDataIn() { pins &= ~DBIN; }
 
     [[nodiscard]] bool waiting_() const { return pins & WAIT; }
-    std::uint16_t pair_(std::uint8_t rp) { return reg_[rp] << 8U | reg_[rp+1]; }
+    std::uint16_t getPair_(const std::uint8_t rp) { return reg_[rp] << 8U | reg_[rp + 1U]; }
+    void setPair_(const std::uint8_t rp, std::uint16_t val) { reg_[rp] = val >> 8U; reg_[rp + 1U] = val & 0xF; }
     void transfer8_(std::uint8_t& dst) const { dst = getDBus(); }
-    void transfer16_(std::uint8_t rp) { reg_[rp << 1] = getDBus(); }
+    void transfer16_(const std::uint8_t rp) { reg_[rp << 1] = getDBus(); }
     [[nodiscard]] std::uint8_t rp_() const { return ir_ >> 4U & 3U; }
     [[nodiscard]] std::uint8_t dst_() const { return ir_ >> 3U & 7U; }
     [[nodiscard]] std::uint8_t src_() const { return ir_ & 7U; }
 
-    void setSignFlag(bool enabled) { enabled ? reg_[F] |= signBit : reg_[F] &= ~signBit; }
-    void setZeroFlag(bool enabled) { enabled ? reg_[F] |= zeroBit : reg_[F] &= ~zeroBit; }
-    void setAuxCarryFlag(bool enabled) { enabled ? reg_[F] |= auxiliaryBit : reg_[F] &= ~auxiliaryBit; }
-    void setParityFlag(bool enabled) { enabled ? reg_[F] |= parityBit : reg_[F] &= ~parityBit; }
-    void setCarryFlag(bool enabled) { enabled ? reg_[F] |= carryBit : reg_[F] &= ~carryBit; }
+    void setSignFlag(const bool enabled) { enabled ? reg_[F] |= signBit : reg_[F] &= ~signBit; }
+    void setZeroFlag(const bool enabled) { enabled ? reg_[F] |= zeroBit : reg_[F] &= ~zeroBit; }
+    void setAuxCarryFlag(const bool enabled) { enabled ? reg_[F] |= auxiliaryBit : reg_[F] &= ~auxiliaryBit; }
+    void setParityFlag(const bool enabled) { enabled ? reg_[F] |= parityBit : reg_[F] &= ~parityBit; }
+    void setCarryFlag(const bool enabled) { enabled ? reg_[F] |= carryBit : reg_[F] &= ~carryBit; }
+
+    void add(std::uint8_t addend) { preFlagsAdd(addend); reg_[A] += addend; postFlags(); }
+    void sub(std::uint8_t subtrahend) { preFlagsSub(subtrahend); reg_[A] -= subtrahend; postFlags(); }
+    void inr(std::uint8_t& operand) { setAuxCarryFlag(((operand & 0xF) + 1U & 0x10)); ++operand; postFlags(); }
+    void dcr(std::uint8_t& operand) { setAuxCarryFlag(((operand & 0xF) - 1U & 0x10)); --operand; postFlags(); }
+
+    void preFlagsAdd(std::uint8_t addend)
+    {
+        setAuxCarryFlag(((reg_[A] & 0xF) + (addend & 0xF) & 0x10));
+        setCarryFlag( reg_[A] + addend > 0xFF);
+    }
+    void preFlagsSub(std::uint8_t subtrahend)
+    {
+        setAuxCarryFlag((reg_[A] & 0xF) - (subtrahend & 0xF) & 0x10);
+        setCarryFlag( reg_[A] < subtrahend);
+    }
+    void postFlags()
+    {
+        setZeroFlag(!reg_[A]);
+        setSignFlag(reg_[A] & 0x8000U);
+        setParityFlag(getParity8(reg_[A]));
+    }
+
+    [[nodiscard]] static bool getParity8(std::uint8_t x)
+    {
+        x ^= x >> 4;
+        x ^= x >> 2;
+        x ^= x >> 1;
+        return x;
+    }
 
     // registers
     std::uint16_t pc_ {0}, sp_ {0};
