@@ -37,25 +37,25 @@ constexpr int mnemonic[72] {
         145, // DCX rp
         147, // DAD rp
         154, // DAA
-        0, // ANA r
-        0, // ANA M
-        0, // ANI data
-        0, // XRA r
-        0, // XRA M
-        0, // XRI data
-        0, // ORA r
-        0, // ORA M
-        0, // ORI data
-        0, // CMP r
-        0, // CMP M
-        0, // CPI data
-        0, // RLC
-        0, // RRC
-        0, // RAL
-        0, // RAR
-        0, // CMA
-        0, // CMC
-        0, // STC
+        155, // ANA r
+        156, // ANA M
+        160, // ANI data
+        164, // XRA r
+        165, // XRA M
+        169, // XRI data
+        173, // ORA r
+        174, // ORA M
+        178, // ORI data
+        182, // CMP r
+        183, // CMP M
+        187, // CPI data
+        191, // RLC
+        192, // RRC
+        193, // RAL
+        194, // RAR
+        195, // CMA
+        196, // CMC
+        197, // STC
         0, // JMP addr
         0, // J cond addr
         0, // CALL addr
@@ -475,7 +475,7 @@ void Intel8080::tick()
             std::swap(reg_[L], reg_[E]);
             goto done;
 
-        // my emulator cheats in this group by not overlapping the arithmetic instructions with the next fetch/decode cycle
+        // my emulator cheats by not overlapping instructions with the next fetch/decode cycle
         // ADD r
         case 88:
             add(reg_[src_()]);
@@ -735,6 +735,211 @@ void Intel8080::tick()
             if ((reg_[A] & 0xF0) > 9 or reg_[F] & carryBit)
                 add(6U << 2U);
             goto done;
+
+
+        // ANA r
+        case 155:
+            ana(reg_[src_()]);
+            goto done;
+
+        // ANA M
+        case 156: goto next;
+        case 157:
+            readT1_(getPair_(HL));
+            goto next;
+        case 158:
+            readT2_();
+            goto next;
+        case 159:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                ana(tmp_);
+                goto done;
+            }
+
+        // ANI data
+        case 160: goto next;
+        case 161:
+            readT1_(pc_);
+            goto next;
+        case 162:
+            readT2_();
+            ++pc_;
+            goto next;
+        case 163:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                ani(tmp_);
+                goto done;
+            }
+
+        // XRA data
+        case 164:
+            xra(reg_[src_()]);
+            goto done;
+
+        // XRA M
+        case 165: goto next;
+        case 166:
+            readT1_(getPair_(HL));
+            goto next;
+        case 167:
+            readT2_();
+            goto next;
+        case 168:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                xra(tmp_);
+                goto done;
+            }
+
+        // XRI data
+        case 169: goto next;
+        case 170:
+            readT1_(pc_);
+            goto next;
+        case 171:
+            readT2_();
+            ++pc_;
+            goto next;
+        case 172:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                xra(tmp_);
+                goto done;
+            }
+
+        // ORA r
+        case 173:
+            ora(reg_[src_()]);
+            goto done;
+
+        // ORA M
+        case 174: goto next;
+        case 175:
+            readT1_(getPair_(HL));
+            goto next;
+        case 176:
+            readT2_();
+            goto next;
+        case 177:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                ora(tmp_);
+                goto done;
+            }
+
+        // ORI data
+        case 178: goto next;
+        case 179:
+            readT1_(pc_);
+            goto next;
+        case 180:
+            readT2_();
+            ++pc_;
+            goto next;
+        case 181:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                ora(tmp_);
+                goto done;
+            }
+
+        // CMP r
+        case 182:
+            cmp(reg_[src_()]);
+            goto done;
+
+        // CMP M
+        case 183: goto next;
+        case 184:
+            readT1_(getPair_(HL));
+            goto next;
+        case 185:
+            readT2_();
+            goto next;
+        case 186:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                cmp(tmp_);
+                goto done;
+            }
+
+        // CPI data
+        case 187: goto next;
+        case 188:
+            readT1_(pc_);
+            goto next;
+        case 189:
+            readT2_();
+            ++pc_;
+            goto next;
+        case 190:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(tmp_);
+                cmp(tmp_);
+                goto done;
+            }
+
+        // RLC
+        case 191:
+            setCarryFlag(reg_[A] & 0x80);
+            reg_[A] <<= 1U | (reg_[F] & carryBit);
+            goto done;
+
+        // RRC
+        case 192:
+            setCarryFlag(reg_[A] & 0x01);
+            reg_[A] >>= 1U | ((reg_[F] & carryBit) << 7U);
+            goto done;
+
+        // RAL
+        case 193: {
+            const std::uint8_t carry {static_cast<uint8_t>(reg_[F] & carryBit)};
+            setCarryFlag(reg_[A] & 0x80);
+            reg_[A] <<= 1U | carry;
+            goto done;
+        }
+
+        // RAR
+        case 194: {
+            const std::uint8_t carry {static_cast<uint8_t>(reg_[F] & carryBit)};
+            setCarryFlag(reg_[A] & 0x01);
+            reg_[A] >>= 1U | (carry << 7U);
+            goto done;
+        }
+
+        // CMA
+        case 195:
+            reg_[A] = ~reg_[A];
+            goto done;
+
+        // CMC
+        case 196:
+            setCarryFlag(~(reg_[F] & carryBit));
+            goto done;
+
+        // STC
+        case 197:
+            setCarryFlag(true);
+            goto done;
+
     }
 
     wait:

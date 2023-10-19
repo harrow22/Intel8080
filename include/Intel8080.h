@@ -190,11 +190,33 @@ private:
     void setParityFlag(const bool enabled) { enabled ? reg_[F] |= parityBit : reg_[F] &= ~parityBit; }
     void setCarryFlag(const bool enabled) { enabled ? reg_[F] |= carryBit : reg_[F] &= ~carryBit; }
 
-    void add(std::uint8_t addend) { preFlagsAdd(addend); reg_[A] += addend; postFlags(); }
-    void sub(std::uint8_t subtrahend) { preFlagsSub(subtrahend); reg_[A] -= subtrahend; postFlags(); }
+    void add(const std::uint8_t addend) { preFlagsAdd(addend); reg_[A] += addend; postFlags(); }
+    void sub(const std::uint8_t subtrahend) { preFlagsSub(subtrahend); reg_[A] -= subtrahend; postFlags(); }
     void inr(std::uint8_t& operand) { setAuxCarryFlag(((operand & 0xF) + 1U & 0x10)); ++operand; postFlags(); }
     void dcr(std::uint8_t& operand) { setAuxCarryFlag(((operand & 0xF) - 1U & 0x10)); --operand; postFlags(); }
+    void ana(const std::uint8_t operand) { preFlagsAnd(operand); reg_[A] &= reg_[src_()]; postFlags(); }
+    void ani(const std::uint8_t operand) { preFlagsLog(); reg_[A] &= operand; postFlags(); }
+    void xra(const std::uint8_t operand) { preFlagsLog(); reg_[A] ^= operand; postFlags(); }
+    void ora(const std::uint8_t operand) { preFlagsLog(); reg_[A] |= operand; postFlags(); }
+    void cmp(const std::uint8_t operand)
+    {
+        const std::uint8_t res {static_cast<uint8_t>(reg_[A] - operand)};
+        preFlagsSub(operand);
+        setZeroFlag(reg_[A] == operand);
+        setSignFlag(res & 0x8000U);
+        setParityFlag(getParity8(res));
+    }
 
+    void preFlagsLog()
+    {
+        setAuxCarryFlag(false);
+        setCarryFlag(false);
+    }
+    void preFlagsAnd(std::uint8_t operand)
+    {
+        setAuxCarryFlag(reg_[A] | operand & 0x4U);
+        setCarryFlag(false);
+    }
     void preFlagsAdd(std::uint8_t addend)
     {
         setAuxCarryFlag(((reg_[A] & 0xF) + (addend & 0xF) & 0x10));
@@ -211,6 +233,7 @@ private:
         setSignFlag(reg_[A] & 0x8000U);
         setParityFlag(getParity8(reg_[A]));
     }
+
 
     [[nodiscard]] static bool getParity8(std::uint8_t x)
     {
