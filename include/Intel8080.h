@@ -173,16 +173,23 @@ private:
     void readT2_() { t2_(); pins |= DBIN; }
     void writeT1_(const std::uint16_t addr) { pins |= SYNC; setDBus(0); setABus(addr); }
     void writeT2_(const std::uint8_t r) { t2_(); pins |= DBIN; setDBus(r); }
+    void stackWriteT1_() { pins |= SYNC; setDBus(STACK); setABus(sp_); }
+    void stackReadT1_() { pins |= SYNC; setDBus(WO|STACK|MEMR); setABus(sp_); }
     void stopDataIn() { pins &= ~DBIN; }
 
     [[nodiscard]] bool waiting_() const { return pins & WAIT; }
     std::uint16_t getPair_(const std::uint8_t rp) { return reg_[rp] << 8U | reg_[rp + 1U]; }
-    void setPair_(const std::uint8_t rp, std::uint16_t val) { reg_[rp] = val >> 8U; reg_[rp + 1U] = val & 0xF; }
+    void setPair_(const std::uint8_t rp, std::uint16_t val) { reg_[rp] = val >> 8U; reg_[rp + 1U] = val & 0xFF; }
     void transfer8_(std::uint8_t& dst) const { dst = getDBus(); }
     void transfer16_(const std::uint8_t rp) { reg_[rp << 1] = getDBus(); }
-    [[nodiscard]] std::uint8_t rp_() const { return ir_ >> 4U & 3U; }
-    [[nodiscard]] std::uint8_t dst_() const { return ir_ >> 3U & 7U; }
+    [[nodiscard]] std::uint8_t rp_() const { return ir_ >> 4U & 0b111; }
+    [[nodiscard]] std::uint8_t dst_() const { return ir_ >> 3U & 0b111000; }
     [[nodiscard]] std::uint8_t src_() const { return ir_ & 7U; }
+    [[nodiscard]] std::uint8_t pch_() const { return pc_ >> 8U & 0xFF; }
+    [[nodiscard]] std::uint8_t pcl_() const { return pc_ & 0xFF; }
+    [[nodiscard]] std::uint8_t nnn_() const { return (ir_ & 0b111000) << 3U; }
+    [[nodiscard]] bool ccc_() const;
+
 
     void setSignFlag(const bool enabled) { enabled ? reg_[F] |= signBit : reg_[F] &= ~signBit; }
     void setZeroFlag(const bool enabled) { enabled ? reg_[F] |= zeroBit : reg_[F] &= ~zeroBit; }
