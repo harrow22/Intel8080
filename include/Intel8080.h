@@ -23,83 +23,12 @@
  *   A14 ○<————│ 15             17 │<———>○ D0
  *   A15 ○<————│ 16                │
  *             └───────────────────┘
- *
- * ## Member Functions:
- * ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- * void tick();
- *   - Steps the processor one state forward. Each instruction consists of 1-5 machine cycles and 3-5 states (T1-T5)
- *   - constitute a machine cycle. A full instruction cycle requires anywhere from 4-18 states for its completion.
- *
- * void reset();
- *   - Restores the processor's internal program counter to zero, and the cpu will begin the next cycle from T1. Note,
- *   - however, that this has no effect on status flags, or on any of the processor's working registers
- *
- * const std::uint_fast64_t getABus();
- *    - Returns the current bits on the address bus.
- *
- * const std::uint_fast64_t getDBus();
- *    - Returns the current bits on the data bus.
- *
- *
- * ## Member Variables:
- * ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- * std::uint8_t status;
- *    - Identifies the current machine cycle. Is set in the second state of every machine cycle.
- *
- * std::uint_fast_64_t pins;
- *    - The current state of the processors pins.
- *
- *
- * ## Status Information Definition:
- * ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- *          Data Bus
- * Symbols     Bit                                      Definition
- * INTA        D0  -  Acknowledge signal for INTERRUPT request. Signal should be used to gate a restart instruction onto
- *                    the data bus when DBIN is active.
- * WO          D1  -  Indicates that the operation in the current machine cycle will be a WRITE memory or OUTPUT
- *                    function (WO = 0). Otherwise a READ memory or INPUT operation will be executed.
- * STACK       D2  -  Indicates that the address bus hold the pushdown stack address from the Stack Pointer.
- * HLTA        D3  -  Acknowledge signal for HALT instruction.
- * OUT         D4  -  Indicates that the address bus contains the address of an output device and the data bus will
- *                    contain the output data when WR is active.
- * M1          D5  -  Provides a signal to indicate that the CPU is in the fetch cycle for the first byte of an
- *                    instruction.
- * INP         D6  -  Indicates that the address bus contains the address of an input device and the input data should
- *                    be placed on the data bus when DBIN is active.
- * MEMR        D7  -  Designates that the data bus will be used for memory read data.
- * ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- * *Data bus bit constants are named as their respective symbols (instead of D0-D7) for readability.
- *
- *
- * ## Machine Cycle Identification:
- * ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- *
- *
- *
- * ## Control Output Definition:
- * ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
- * SYNC  -  Marks the beginning of every machine cycle. Active from T1 until T2.
+ * See README for documentation.
  */
 
 class Intel8080 {
 public:
     // pin bit constants
-    static constexpr std::uint_fast64_t A0 {1ULL << 0ULL};
-    static constexpr std::uint_fast64_t A1 {1ULL << 1ULL};
-    static constexpr std::uint_fast64_t A2 {1ULL << 2ULL};
-    static constexpr std::uint_fast64_t A3 {1ULL << 4ULL};
-    static constexpr std::uint_fast64_t A4 {1ULL << 5ULL};
-    static constexpr std::uint_fast64_t A5 {1ULL << 6ULL};
-    static constexpr std::uint_fast64_t A6 {1ULL << 7ULL};
-    static constexpr std::uint_fast64_t A7 {1ULL << 8ULL};
-    static constexpr std::uint_fast64_t A8 {1ULL << 9ULL};
-    static constexpr std::uint_fast64_t A9 {1ULL << 10ULL};
-    static constexpr std::uint_fast64_t A10 {1ULL << 11ULL};
-    static constexpr std::uint_fast64_t A11 {1ULL << 12ULL};
-    static constexpr std::uint_fast64_t A12 {1ULL << 13ULL};
-    static constexpr std::uint_fast64_t A13 {1ULL << 14ULL};
-    static constexpr std::uint_fast64_t A14 {1ULL << 15ULL};
-    static constexpr std::uint_fast64_t A15 {1ULL << 16ULL};
     static constexpr std::uint_fast64_t INTA {1ULL << 17ULL};
     static constexpr std::uint_fast64_t WO {1ULL << 18ULL};
     static constexpr std::uint_fast64_t STACK {1ULL << 19ULL};
@@ -121,7 +50,7 @@ public:
     static constexpr std::uint_fast64_t dbus {0xFF0000ULL};
 
     void tick();
-    void reset() { pc_ = step_ = 0; }
+    void reset() { pc_ = step_ = 0; stopped = false; }
     [[nodiscard]] std::uint_fast64_t getABus() const { return pins & abus; }
     [[nodiscard]] std::uint_fast64_t getDBus() const { return pins & dbus; }
     void setDBus(std::uint_fast64_t val) { pins = pins & ~0xFF0000ULL | val << 16ULL; }
@@ -179,6 +108,7 @@ private:
     void stopDataIn() { pins &= ~DBIN; }
     void stopDataOut() { pins &= ~WR; }
     [[nodiscard]] bool waiting_() const { return pins & WAIT; }
+    [[nodiscard]] bool interrupted_() const { return pins & (INT | INTE); }
     void t2_()
     {
         status = getDBus();
@@ -261,8 +191,7 @@ private:
     std::uint8_t reg_[11] {};
     std::uint16_t step_ {0};
 
-    // cpu options
-    bool interruptEnabled {true};
+    // cpu stopped state bool
     bool stopped {false};
 };
 

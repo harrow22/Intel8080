@@ -101,17 +101,23 @@ constexpr int opcode[256] {
  */
 void Intel8080::tick()
 {
-    if (pins & INT and pins & INTE) {
-        return;
+    if (stopped) {
+        if (!interrupted_())
+            return;
+        stopped = false;
     }
+
     switch (step_) {
         // instruction fetch
         case 0:
             fetchT1_();
+            if (interrupted_())
+                pins |= INTA;
             goto next;
         case 1:
             readT2_();
-            ++pc_;
+            if (!interrupted_())
+                ++pc_;
             goto next;
         case 2:
             if (waiting_()) goto wait;
@@ -1472,12 +1478,12 @@ void Intel8080::tick()
 
         // EI
         case 326:
-            interruptEnabled = true;
+            pins |= INTE;
             goto done;
 
         // DI
         case 327:
-            interruptEnabled = false;
+            pins &= ~INTE;
             goto done;
 
         // HLT
@@ -1495,12 +1501,12 @@ void Intel8080::tick()
     }
 
     wait:
-    if (pins & READY)
-        pins &= ~WAIT;
+        if (pins & READY)
+            pins &= ~WAIT;
     next:
-    ++step_;
+        ++step_;
     done:
-    step_ = 0;
+        step_ = 0;
 }
 
 bool Intel8080::ccc_() const {
