@@ -62,19 +62,19 @@ constexpr int mnemonic[72] {
         227, // C cond addr
         241, // RET
         248, // R cond addr
-        0, // RST n
-        0, // PCHL
-        0, // PUSH rp
-        0, // PUSH PSW
-        0, // POP rp
-        0, // POP PSW
-        0, // XTHL
-        0, // IN port
-        0, // OUT port
-        0, // EI
-        0, // DI
-        0, // HLT
-        0, // NOP
+        256, // RST n
+        264, // PCHL
+        266, // PUSH rp
+        274, // PUSH PSW
+        283, // POP rp
+        290, // POP PSW
+        297, // XTHL
+        312, // IN port
+        319, // OUT port
+        326, // EI
+        327, // DI
+        328, // HLT
+        331, // NOP
 };
 
 constexpr int opcode[256] {
@@ -107,7 +107,7 @@ void Intel8080::tick()
     switch (step_) {
         // instruction fetch
         case 0:
-            fetch_();
+            fetchT1_();
             goto next;
         case 1:
             readT2_();
@@ -153,7 +153,7 @@ void Intel8080::tick()
         case 10:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataOut();
                 goto done;
             }
 
@@ -203,7 +203,7 @@ void Intel8080::tick()
         case 24:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataOut();
                 goto done;
             }
 
@@ -322,9 +322,9 @@ void Intel8080::tick()
         case 51:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataOut();
                 goto done;
-            };
+            }
 
         // LHLD addr
         case 52: goto next;
@@ -422,7 +422,7 @@ void Intel8080::tick()
         case 75:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataOut();
                 goto next;
             }
         case 76:
@@ -434,7 +434,7 @@ void Intel8080::tick()
         case 78:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataOut();
                 goto done;
             }
 
@@ -465,7 +465,7 @@ void Intel8080::tick()
         case 86:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataOut();
                 goto done;
             }
 
@@ -518,7 +518,7 @@ void Intel8080::tick()
 
         // ADC r
         case 97:
-            add(reg_[src_()] + reg_[F] & carryBit); // TODO: does this work or do i need to pass both?
+            add(reg_[src_()] + cy_()); // TODO: does this work or do i need to pass both?
             goto done;
 
         // ADC M
@@ -534,7 +534,7 @@ void Intel8080::tick()
             else {
                 stopDataIn();
                 transfer8_(tmp_);
-                add(tmp_ + reg_[F] & carryBit);
+                add(tmp_ + cy_());
                 goto done;
             }
 
@@ -552,7 +552,7 @@ void Intel8080::tick()
             else {
                 stopDataIn();
                 transfer8_(tmp_);
-                add(tmp_ + reg_[F] & carryBit);
+                add(tmp_ + cy_());
                 goto done;
             }
 
@@ -598,7 +598,7 @@ void Intel8080::tick()
 
         // SBB r
         case 116:
-            sub(reg_[src_()] - reg_[F] & carryBit);
+            sub(reg_[src_()] - cy_());
             goto done;
 
         // SBB M
@@ -614,7 +614,7 @@ void Intel8080::tick()
             else {
                 stopDataIn();
                 transfer8_(tmp_);
-                add(tmp_ - reg_[F] & carryBit);
+                add(tmp_ - cy_());
                 goto done;
             }
 
@@ -632,7 +632,7 @@ void Intel8080::tick()
             else {
                 stopDataIn();
                 transfer8_(tmp_);
-                add(tmp_ - reg_[F] & carryBit);
+                add(tmp_ - cy_());
                 goto done;
             }
 
@@ -667,7 +667,7 @@ void Intel8080::tick()
         case 133:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataOut();
                 goto done;
             }
 
@@ -702,7 +702,7 @@ void Intel8080::tick()
         case 142:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataOut();
                 goto done;
             }
 
@@ -732,7 +732,7 @@ void Intel8080::tick()
         case 154:
             if ((reg_[A] & 0xF) > 9)
                 add(6U);
-            if ((reg_[A] & 0xF0) > 9 or reg_[F] & carryBit)
+            if ((reg_[A] & 0xF0) > 9 or cy_())
                 add(6U << 2U);
             goto done;
 
@@ -900,18 +900,18 @@ void Intel8080::tick()
         // RLC
         case 191:
             setCarryFlag(reg_[A] & 0x80);
-            reg_[A] <<= 1U | (reg_[F] & carryBit);
+            reg_[A] <<= 1U | (cy_());
             goto done;
 
         // RRC
         case 192:
             setCarryFlag(reg_[A] & 0x01);
-            reg_[A] >>= 1U | ((reg_[F] & carryBit) << 7U);
+            reg_[A] >>= 1U | (cy_() << 7U);
             goto done;
 
         // RAL
         case 193: {
-            const std::uint8_t carry {static_cast<uint8_t>(reg_[F] & carryBit)};
+            const std::uint8_t carry {cy_()};
             setCarryFlag(reg_[A] & 0x80);
             reg_[A] <<= 1U | carry;
             goto done;
@@ -919,7 +919,7 @@ void Intel8080::tick()
 
         // RAR
         case 194: {
-            const std::uint8_t carry {static_cast<uint8_t>(reg_[F] & carryBit)};
+            const std::uint8_t carry {cy_()};
             setCarryFlag(reg_[A] & 0x01);
             reg_[A] >>= 1U | (carry << 7U);
             goto done;
@@ -932,7 +932,7 @@ void Intel8080::tick()
 
         // CMC
         case 196:
-            setCarryFlag(~(reg_[F] & carryBit));
+            setCarryFlag(~cy_());
             goto done;
 
         // STC
@@ -1006,7 +1006,8 @@ void Intel8080::tick()
             }
 
         // CALL addr
-        case 213: case 214:
+        case 213: goto next;
+        case 214:
             --sp_;
             goto next;
         case 215:
@@ -1047,7 +1048,7 @@ void Intel8080::tick()
         case 223:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataOut();
                 goto next;
             }
         case 224:
@@ -1059,13 +1060,14 @@ void Intel8080::tick()
         case 226:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataOut();
                 pc_ = getPair_(WZ);
                 goto done;
             }
 
         // CALL cond addr
-        case 227: case 228:
+        case 227: goto next;
+        case 228:
             if (ccc_())
                 --sp_;
             goto next;
@@ -1109,7 +1111,7 @@ void Intel8080::tick()
         case 237:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataOut();
                 goto next;
             }
         case 238:
@@ -1121,7 +1123,7 @@ void Intel8080::tick()
         case 240:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataOut();
                 pc_ = getPair_(WZ);
                 goto done;
             }
@@ -1158,7 +1160,8 @@ void Intel8080::tick()
             }
 
         // R cond addr
-        case 248: case 249:
+        case 248: goto next;
+        case 249:
             if (ccc_())
                 goto next;
             goto done;
@@ -1192,7 +1195,8 @@ void Intel8080::tick()
             }
 
         // RST n
-        case 256: case 257:
+        case 256: goto next;
+        case 257:
             --sp_;
             goto next;
         case 258:
@@ -1205,7 +1209,7 @@ void Intel8080::tick()
         case 260:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataOut();
                 goto next;
             }
         case 261:
@@ -1217,16 +1221,277 @@ void Intel8080::tick()
         case 263:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataOut();
                 setPair_(WZ, nnn_() * 8U);
                 pc_ = getPair_(WZ);
                 goto done;
             }
 
         // PCHL
-        case 264: case 265:
+        case 264: goto next;
+        case 265:
             pc_ = getPair_(HL);
             goto done;
+
+        // PUSH rp
+        case 266: goto next;
+        case 267:
+            --sp_;
+            goto next;
+        case 268:
+            stackWriteT1_();
+            goto next;
+        case 269:
+            --sp_;
+            writeT2_(reg_[rp_() + 1U]);
+            goto next;
+        case 270:
+            if (waiting_()) goto wait;
+            else {
+                stopDataOut();
+                goto next;
+            }
+        case 271:
+            stackWriteT1_();
+            goto next;
+        case 272:
+            writeT2_(reg_[rp_()]);
+            goto next;
+        case 273:
+            if (waiting_()) goto wait;
+            else {
+                stopDataOut();
+                goto done;
+            }
+
+        // PUSH PSW
+        case 274: case 275:
+            --sp_;
+            goto next;
+        case 276:
+            stackWriteT1_();
+            goto next;
+        case 278:
+            --sp_;
+            writeT2_(reg_[A]);
+            goto next;
+        case 279:
+            if (waiting_()) goto wait;
+            else {
+                stopDataOut();
+                goto next;
+            }
+        case 280:
+            stackWriteT1_();
+            goto next;
+        case 281:
+            writeT2_(psw_());
+            goto next;
+        case 282:
+            if (waiting_()) goto wait;
+            else {
+                stopDataOut();
+                goto done;
+            }
+
+        // POP rp
+        case 283: goto next;
+        case 284:
+            stackReadT1_();
+            goto next;
+        case 285:
+            ++sp_;
+            readT2_();
+        case 286:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(reg_[rp_() + 1U]);
+                goto next;
+            }
+        case 287:
+            stackReadT1_();
+            goto next;
+        case 288:
+            ++sp_;
+            readT2_();
+        case 289:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(reg_[rp_()]);
+                goto done;
+            }
+
+        // POP psw
+        case 290: goto next;
+        case 291:
+            stackReadT1_();
+            goto next;
+        case 292:
+            ++sp_;
+            readT2_();
+        case 293:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(reg_[F]);
+                goto next;
+            }
+        case 294:
+            stackReadT1_();
+            goto next;
+        case 295:
+            ++sp_;
+            readT2_();
+        case 296:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(reg_[A]);
+                goto done;
+            }
+
+        // XTHL
+        case 297: goto next;
+        case 298:
+            stackReadT1_();
+            goto next;
+        case 299:
+            ++sp_;
+            goto next;
+        case 300:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(reg_[Z]);
+                goto next;
+            }
+        case 301:
+            stackReadT1_();
+            goto next;
+        case 302:
+            readT2_();
+            goto next;
+        case 303:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(reg_[W]);
+                goto next;
+            }
+        case 304:
+            stackWriteT1_();
+            goto next;
+        case 305:
+            writeT2_(reg_[H]);
+            goto next;
+        case 306:
+            if (waiting_()) goto wait;
+            else {
+                stopDataOut();
+                goto next;
+            }
+        case 307:
+            stackWriteT1_();
+            goto next;
+        case 308:
+            writeT2_(reg_[L]);
+            goto next;
+        case 309:
+            if (waiting_()) goto wait;
+            else {
+                stopDataOut();
+                goto next;
+            }
+        case 310: goto next;
+        case 311:
+            setPair_(HL, getPair_(WZ));
+            goto done;
+
+        // IN port
+        case 312: goto next;
+        case 313:
+            readT1_(pc_);
+            goto next;
+        case 314:
+            readT2_();
+            ++pc_;
+            goto next;
+        case 315:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(reg_[Z]);
+                reg_[W] = 0U;
+                goto next;
+            }
+        case 316:
+            inputReadT1_();
+            goto next;
+        case 317:
+            readT2_();
+            goto next;
+        case 318:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(reg_[A]);
+                goto done;
+            }
+
+        // OUT port
+        case 319: goto next;
+        case 320:
+            readT1_(pc_);
+            goto next;
+        case 321:
+            readT2_();
+            ++pc_;
+            goto next;
+        case 322:
+            if (waiting_()) goto wait;
+            else {
+                stopDataIn();
+                transfer8_(reg_[Z]);
+                reg_[W] = 0U;
+                goto next;
+            }
+        case 323:
+            outputWriteT1_();
+            goto next;
+        case 324:
+            writeT2_(reg_[A]);
+            goto next;
+        case 325:
+            if (waiting_()) goto wait;
+            else {
+                stopDataOut();
+                goto done;
+            }
+
+        // EI
+        case 326:
+            interruptEnabled = true;
+            goto done;
+
+        // DI
+        case 327:
+            interruptEnabled = false;
+            goto done;
+
+        // HLT
+        case 328: goto next;
+        case 329:
+            setDBus(WO|HLTA|MEMR);
+            goto next;
+        case 330:
+            ++pc_;
+            stopped = true;
+            goto done;
+
+        // NOP
+        case 331: goto done;
     }
 
     wait:
@@ -1241,20 +1506,20 @@ void Intel8080::tick()
 bool Intel8080::ccc_() const {
     switch (ir_ >> 3U & 7U) {
         // NZ - not zero (Z = 0)
-        case 0b000: return (reg_[F] & zeroBit) == 0;
+        case 0b000: return (z_()) == 0;
         // Z - zero (Z = 1)
-        case 0b001: return (reg_[F] & zeroBit) != 0;
+        case 0b001: return (z_()) != 0;
         // NC - no carry (CY = 0)
-        case 0b010: return (reg_[F] & carryBit) == 0;
+        case 0b010: return (cy_()) == 0;
         // C - carry (CY = 1)
-        case 0b011: return (reg_[F] & carryBit) != 0;
+        case 0b011: return (cy_()) != 0;
         // PO - parity odd (P = 0)
-        case 0b100: return (reg_[F] & parityBit) == 0;
+        case 0b100: return (p_()) == 0;
         // PE - parity even (P = 1)
-        case 0b101: return (reg_[F] & parityBit) != 0;
+        case 0b101: return (p_()) != 0;
         // P - plus (S = 0)
-        case 0b110: return (reg_[F] & signBit) == 0;
+        case 0b110: return (s_()) == 0;
         // M - minus (S = 1)
-        case 0b111: return (reg_[F] & signBit) != 0;
+        case 0b111: return (s_()) != 0;
     }
 }
