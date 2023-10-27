@@ -23,47 +23,43 @@
  *   A14 ○<————│ 15             17 │<———>○ D0
  *   A15 ○<————│ 16                │
  *             └───────────────────┘
- * See README for documentation.
+ * See README for usage.
  */
 
 class Intel8080 {
 public:
     // pin bit constants
-    static constexpr std::uint_fast64_t INTA {1ULL << 17ULL};
-    static constexpr std::uint_fast64_t WO {1ULL << 18ULL};
-    static constexpr std::uint_fast64_t STACK {1ULL << 19ULL};
-    static constexpr std::uint_fast64_t HLTA {1ULL << 20ULL};
-    static constexpr std::uint_fast64_t OUT {1ULL << 21ULL};
-    static constexpr std::uint_fast64_t M1 {1ULL << 22ULL};
-    static constexpr std::uint_fast64_t INP {1ULL << 23ULL};
-    static constexpr std::uint_fast64_t MEMR {1ULL << 24ULL};
-    static constexpr std::uint_fast64_t INTE {1ULL << 25ULL};
-    static constexpr std::uint_fast64_t DBIN {1ULL << 26ULL};
-    static constexpr std::uint_fast64_t WR {1ULL << 27ULL};
-    static constexpr std::uint_fast64_t SYNC {1ULL << 28ULL};
-    static constexpr std::uint_fast64_t WAIT {1ULL << 29ULL};
-    static constexpr std::uint_fast64_t INT {1ULL << 30ULL};
-    static constexpr std::uint_fast64_t READY {1ULL << 31ULL};
-
-    // bus constants
-    static constexpr std::uint_fast64_t abus {0xFFFFULL};
-    static constexpr std::uint_fast64_t dbus {0xFF0000ULL};
-
-    void tick();
-    void reset() { pc_ = step_ = 0; stopped = false; }
-    [[nodiscard]] std::uint_fast64_t getABus() const { return pins & abus; }
-    [[nodiscard]] std::uint_fast64_t getDBus() const { return pins & dbus; }
-    void setDBus(std::uint_fast64_t val) { pins = pins & ~0xFF0000ULL | val << 16ULL; }
-
-    std::uint8_t status {0};
-    std::uint_fast64_t pins {0};
-private:
-    // flag bit constants
-    static constexpr std::uint8_t signBit {0x80U};
-    static constexpr std::uint8_t zeroBit {0x40U};
-    static constexpr std::uint8_t auxiliaryBit {0x10U};
-    static constexpr std::uint8_t parityBit {0x04U};
-    static constexpr std::uint8_t carryBit {0x01U};
+    static constexpr std::uint_fast64_t A0 {1ULL << 0ULL};
+    static constexpr std::uint_fast64_t A1 {1ULL << 1ULL};
+    static constexpr std::uint_fast64_t A2 {1ULL << 2ULL};
+    static constexpr std::uint_fast64_t A3 {1ULL << 3ULL};
+    static constexpr std::uint_fast64_t A4 {1ULL << 4ULL};
+    static constexpr std::uint_fast64_t A5 {1ULL << 5ULL};
+    static constexpr std::uint_fast64_t A6 {1ULL << 6ULL};
+    static constexpr std::uint_fast64_t A7 {1ULL << 7ULL};
+    static constexpr std::uint_fast64_t A8 {1ULL << 8ULL};
+    static constexpr std::uint_fast64_t A9 {1ULL << 9ULL};
+    static constexpr std::uint_fast64_t A10 {1ULL << 10ULL};
+    static constexpr std::uint_fast64_t A11 {1ULL << 11ULL};
+    static constexpr std::uint_fast64_t A12 {1ULL << 12ULL};
+    static constexpr std::uint_fast64_t A13 {1ULL << 13ULL};
+    static constexpr std::uint_fast64_t A14 {1ULL << 14ULL};
+    static constexpr std::uint_fast64_t A15 {1ULL << 15ULL};
+    static constexpr std::uint_fast64_t INTA {1ULL << 16ULL};
+    static constexpr std::uint_fast64_t WO {1ULL << 17ULL};
+    static constexpr std::uint_fast64_t STACK {1ULL << 18ULL};
+    static constexpr std::uint_fast64_t HLTA {1ULL << 19ULL};
+    static constexpr std::uint_fast64_t OUT {1ULL << 20ULL};
+    static constexpr std::uint_fast64_t M1 {1ULL << 21ULL};
+    static constexpr std::uint_fast64_t INP {1ULL << 22ULL};
+    static constexpr std::uint_fast64_t MEMR {1ULL << 23ULL};
+    static constexpr std::uint_fast64_t INTE {1ULL << 24ULL};
+    static constexpr std::uint_fast64_t DBIN {1ULL << 25ULL};
+    static constexpr std::uint_fast64_t WR {1ULL << 26ULL};
+    static constexpr std::uint_fast64_t SYNC {1ULL << 27ULL};
+    static constexpr std::uint_fast64_t WAIT {1ULL << 28ULL};
+    static constexpr std::uint_fast64_t INT {1ULL << 29ULL};
+    static constexpr std::uint_fast64_t READY {1ULL << 30ULL};
 
     // register name constants
     static constexpr std::uint8_t B {0U};
@@ -72,127 +68,198 @@ private:
     static constexpr std::uint8_t E {3U};
     static constexpr std::uint8_t H {4U};
     static constexpr std::uint8_t L {5U};
-    static constexpr std::uint8_t W {9U};
-    static constexpr std::uint8_t Z {10U};
-    static constexpr std::uint8_t BC {B};
-    static constexpr std::uint8_t DE {D};
-    static constexpr std::uint8_t HL {H};
-    static constexpr std::uint8_t WZ {W};
     static constexpr std::uint8_t A {7U};
     static constexpr std::uint8_t F {8U};
+    static constexpr std::uint8_t BC {0U};
+    static constexpr std::uint8_t DE {1U};
+    static constexpr std::uint8_t HL {2U};
+    static constexpr std::uint8_t SP {3U};
+    static constexpr std::uint8_t WZ {4U};
 
-    // get & set flag member functions
-    [[nodiscard]] std::uint8_t cy_() const { return reg_[F] & carryBit; }
-    [[nodiscard]] std::uint8_t p_() const { return reg_[F] & parityBit; }
-    [[nodiscard]] std::uint8_t ac_() const { return reg_[F] & auxiliaryBit; }
-    [[nodiscard]] std::uint8_t z_() const { return reg_[F] & zeroBit; }
-    [[nodiscard]] std::uint8_t s_() const { return reg_[F] & signBit; }
-    void setSignFlag(const bool enabled) { enabled ? reg_[F] |= signBit : reg_[F] &= ~signBit; }
-    void setZeroFlag(const bool enabled) { enabled ? reg_[F] |= zeroBit : reg_[F] &= ~zeroBit; }
-    void setAuxCarryFlag(const bool enabled) { enabled ? reg_[F] |= auxiliaryBit : reg_[F] &= ~auxiliaryBit; }
-    void setParityFlag(const bool enabled) { enabled ? reg_[F] |= parityBit : reg_[F] &= ~parityBit; }
-    void setCarryFlag(const bool enabled) { enabled ? reg_[F] |= carryBit : reg_[F] &= ~carryBit; }
+    // bus constants
+    static constexpr std::uint_fast64_t abus {0xFFFFULL};
+    static constexpr std::uint_fast64_t dbus {0xFF0000ULL};
 
-    // symbol member functions (see ch4 intel 8080 data sheet)
-    [[nodiscard]] std::uint8_t rp_() const { return ir_ >> 4U & 0b111; }
-    [[nodiscard]] std::uint8_t dst_() const { return ir_ >> 3U & 0b111000; }
-    [[nodiscard]] std::uint8_t src_() const { return ir_ & 7U; }
-    [[nodiscard]] std::uint8_t pch_() const { return pc_ >> 8U & 0xFF; }
-    [[nodiscard]] std::uint8_t pcl_() const { return pc_ & 0xFF; }
-    [[nodiscard]] std::uint8_t nnn_() const { return (ir_ & 0b111000) << 3U; }
-    [[nodiscard]] std::uint8_t psw_() const { return reg_[F] | 0b10U; }
+    // TODO: fill in doc comments
+    /**
+     *
+     */
+    void tick();
+
+    /**
+     *
+     */
+    void reset() { pc = step_ = 0; stopped = false; }
+
+    /**
+     *
+     * @param val
+     */
+    void setDBus(std::uint_fast8_t val) { pins = (pins & ~dbus) | (val << 16ULL); }
+
+    /**
+     *
+     * @param val
+     */
+    void setDBus(std::uint_fast64_t val) { pins = (pins & ~dbus) | val; }
+
+    /**
+     *
+     * @return
+     */
+    [[nodiscard]] std::uint16_t getABus() const { return pins & abus; }
+
+    /**
+     *
+     * @return
+     */
+    [[nodiscard]] std::uint8_t getDBus() const { return (pins & dbus) >> 16ULL; }
+
+    /**
+     *
+     * @return
+     */
+    [[nodiscard]] std::uint8_t cy() const { return f_ & carryBit; }
+
+    /**
+     *
+     * @return
+     */
+    [[nodiscard]] std::uint8_t p() const { return (f_ & parityBit) >> 2U; }
+
+    /**
+     *
+     * @return
+     */
+    [[nodiscard]] std::uint8_t ac() const { return (f_ & auxiliaryBit) >> 4U; }
+
+    /**
+     *
+     * @return
+     */
+    [[nodiscard]] std::uint8_t z() const { return (f_ & zeroBit) >> 6U; }
+
+    /**
+     *
+     * @return
+     */
+    [[nodiscard]] std::uint8_t s() const { return (f_ & signBit) >> 7U; }
+
+    /**
+     *
+     * @param
+     * @return
+     */
+    [[nodiscard]] std::uint8_t getReg(std::uint8_t) const;
+
+    /**
+     *
+     * @param rp
+     * @return
+     */
+    [[nodiscard]] std::uint16_t getPair(const std::uint8_t rp) const { return pair_[rp]; }
+
+    // the cpu's program counter
+    std::uint16_t pc {0};
+
+    /* the current cpu status word
+     * 10100010: Instruction Fetch
+     * 10000010: Memory Read
+     * 00000000: Memory Write
+     * 10000110: Stack Read
+     * 00000100: Stack Write
+     * 01000010: Input Read
+     * 00010000: Output Write
+     * 00100011: Interrupt Acknowledge
+     * 10001010: Halt Acknowledge
+     * 00101011: Interrupt Acknowledge While Halted
+     */
+    std::uint8_t status {0};
+
+    // the cpu's pins (see pinout at top of header file)
+    std::uint_fast64_t pins {0 | READY};
+
+    // pointer to internal instruction register for debugging
+    const std::uint8_t& ir {ir_};
+private:
+    // flag bit constants
+    static constexpr std::uint8_t signBit {0b10000000U};
+    static constexpr std::uint8_t zeroBit {0b01000000U};
+    static constexpr std::uint8_t auxiliaryBit {0b00010000U};
+    static constexpr std::uint8_t parityBit {0b00000100U};
+    static constexpr std::uint8_t carryBit {0b00000001U};
+
+    // set flag functions
+    void setSignFlag(const bool enabled) { enabled ? f_ |= signBit : f_ &= ~signBit; }
+    void setZeroFlag(const bool enabled) { enabled ? f_ |= zeroBit : f_ &= ~zeroBit; }
+    void setAuxCarryFlag(const bool enabled) { enabled ? f_ |= auxiliaryBit : f_ &= ~auxiliaryBit; }
+    void setParityFlag(const bool enabled) { enabled ? f_ |= parityBit : f_ &= ~parityBit; }
+    void setCarryFlag(const bool enabled) { enabled ? f_ |= carryBit : f_ &= ~carryBit; }
+
+    // symbol functions (see ch4 intel 8080 data sheet)
+    [[nodiscard]] std::uint8_t rp_() const { return (ir_ & 0b110000U) >> 4U; }
+    [[nodiscard]] std::uint8_t dst_() const { return (ir_ & 0b111000U) >> 3U; }
+    [[nodiscard]] std::uint8_t src_() const { return ir_ & 0b111U; }
+    [[nodiscard]] std::uint8_t nnn_() const { return (ir_ & 0b111000) >> 3U; }
+    [[nodiscard]] std::uint8_t psw_() const { return f_; }
     [[nodiscard]] bool ccc_() const;
 
-    // common pin manipulation member functions
-    void setABus(std::uint_fast64_t val) { pins = pins & ~0xFFULL | val; }
+    // common pin manipulation functions
+    void setABus(std::uint16_t val) { pins = pins & ~0xFFFFULL | val; }
     void stopDataIn() { pins &= ~DBIN; }
     void stopDataOut() { pins &= ~WR; }
     [[nodiscard]] bool waiting_() const { return pins & WAIT; }
     [[nodiscard]] bool interrupted_() const { return pins & (INT | INTE); }
-    void t2_()
-    {
-        status = getDBus();
-        pins &= ~SYNC;
-        if (!(pins & READY))
-            pins |= WAIT;
-    };
-    void fetchT1_() { pins |= SYNC; setDBus(WO|M1|MEMR); setABus(pc_); }
-    void readT1_(const std::uint16_t addr) { pins |= SYNC; setDBus(WO|MEMR); setABus(addr); }
-    void readT2_() { t2_(); pins |= DBIN; }
-    void writeT1_(const std::uint16_t addr) { pins |= SYNC; setDBus(0); setABus(addr); }
-    void writeT2_(const std::uint8_t r) { t2_(); pins |= WR; setDBus(r); }
-    void stackWriteT1_() { pins |= SYNC; setDBus(STACK); setABus(sp_); }
-    void stackReadT1_() { pins |= SYNC; setDBus(WO|STACK|MEMR); setABus(sp_); }
-    void inputReadT1_() { pins |= SYNC; setDBus(WO|INP); setABus(getPair_(WZ)); }
-    void outputWriteT1_() { pins |= SYNC; setDBus(OUT); setABus(getPair_(WZ)); }
 
-    // helper member functions
-    [[nodiscard]] std::uint16_t getPair_(const std::uint8_t rp) { return reg_[rp] << 8U | reg_[rp + 1U]; }
-    void setPair_(const std::uint8_t rp, std::uint16_t val) { reg_[rp] = val >> 8U; reg_[rp + 1U] = val & 0xFF; }
-    void transfer8_(std::uint8_t& dst) const { dst = getDBus(); }
-    void transfer16_(const std::uint8_t rp) { reg_[rp << 1] = getDBus(); }
+    // helper functions
+    void setReg(std::uint8_t, std::uint8_t);
+    void setHi_(const std::uint8_t rp, std::uint8_t val) { pair_[rp] = (pair_[rp] & 0x00FF) | (val << 8U); }
+    void setLo_(const std::uint8_t rp, std::uint8_t val) { pair_[rp] = (pair_[rp] & 0xFF00) | val; }
+    [[nodiscard]] static std::uint8_t hi_(const std::uint16_t val) { return (val & 0xFF00) >> 8U; }
+    [[nodiscard]] static std::uint8_t lo_(const std::uint16_t val) { return val & 0xFF; }
 
-    // arithmetic & logical member functions
-    void add(const std::uint8_t addend) { preFlagsAdd(addend); reg_[A] += addend; postFlags(); }
-    void sub(const std::uint8_t subtrahend) { preFlagsSub(subtrahend); reg_[A] -= subtrahend; postFlags(); }
-    void inr(std::uint8_t& operand) { setAuxCarryFlag(((operand & 0xF) + 1U & 0x10)); ++operand; postFlags(); }
-    void dcr(std::uint8_t& operand) { setAuxCarryFlag(((operand & 0xF) - 1U & 0x10)); --operand; postFlags(); }
-    void ana(const std::uint8_t operand) { preFlagsAnd(operand); reg_[A] &= reg_[src_()]; postFlags(); }
-    void ani(const std::uint8_t operand) { preFlagsLog(); reg_[A] &= operand; postFlags(); }
-    void xra(const std::uint8_t operand) { preFlagsLog(); reg_[A] ^= operand; postFlags(); }
-    void ora(const std::uint8_t operand) { preFlagsLog(); reg_[A] |= operand; postFlags(); }
-    void cmp(const std::uint8_t operand)
-    {
-        const std::uint8_t res {static_cast<uint8_t>(reg_[A] - operand)};
-        preFlagsSub(operand);
-        setZeroFlag(reg_[A] == operand);
-        setSignFlag(res & 0x8000U);
-        setParityFlag(getParity8(res));
-    }
+    // state functions
+    void t1_(); // ONLY TO BE CALLED AFTER setDBus() CALL
+    void t2_();;
+    void fetchT1_();
+    void readT1_(std::uint16_t);
+    void writeT1_(std::uint16_t);
+    void stackWriteT1_();
+    void stackWriteT1_(std::uint16_t);
+    void stackReadT1_();
+    void stackReadT1_(std::uint16_t);
+    void inputReadT1_();
+    void outputWriteT1_();
+    void readT2_();
+    void writeT2_(std::uint8_t);
 
-    // flag helper member functions
-    void preFlagsLog()
-    {
-        setAuxCarryFlag(false);
-        setCarryFlag(false);
-    }
-    void preFlagsAnd(std::uint8_t operand)
-    {
-        setAuxCarryFlag(reg_[A] | operand & 0x4U);
-        setCarryFlag(false);
-    }
-    void preFlagsAdd(std::uint8_t addend)
-    {
-        setAuxCarryFlag(((reg_[A] & 0xF) + (addend & 0xF) & 0x10));
-        setCarryFlag( reg_[A] + addend > 0xFF);
-    }
-    void preFlagsSub(std::uint8_t subtrahend)
-    {
-        setAuxCarryFlag((reg_[A] & 0xF) - (subtrahend & 0xF) & 0x10);
-        setCarryFlag( reg_[A] < subtrahend);
-    }
-    void postFlags()
-    {
-        setZeroFlag(!reg_[A]);
-        setSignFlag(reg_[A] & 0x8000U);
-        setParityFlag(getParity8(reg_[A]));
-    }
-    [[nodiscard]] static bool getParity8(std::uint8_t x)
-    {
-        x ^= x >> 4;
-        x ^= x >> 2;
-        x ^= x >> 1;
-        return x;
-    }
+    // arithmetic & logical functions
+    void add(std::uint8_t);
+    void adc(std::uint8_t);
+    void sub(std::uint8_t);
+    void sbb(std::uint8_t);
+    std::uint8_t inr(std::uint8_t);
+    std::uint8_t dcr(std::uint8_t);
+    void ana(std::uint8_t);
+    void ani(std::uint8_t);
+    void xra(std::uint8_t);
+    void ora(std::uint8_t);
+    void cmp(std::uint8_t);
+
+    // flag helper functions
+    void carryFlagsAlg();
+    void carryFlagsAnd(std::uint8_t);
+    void carryFlagsAdd(std::uint8_t, std::uint8_t cy=0);
+    void carryFlagsSub(std::uint8_t, std::uint8_t cy=0);
+    void zspFlags(std::uint8_t);
+
+    std::uint16_t step_ {0};
+    bool stopped {false};
 
     // registers
-    std::uint16_t pc_ {0}, sp_ {0};
     std::uint8_t ir_ {0}, tmp_ {0};
-    std::uint8_t reg_[11] {};
-    std::uint16_t step_ {0};
-
-    // cpu stopped state bool
-    bool stopped {false};
+    std::uint8_t a_ {0}, f_ {0b10U};
+    std::uint16_t pair_[5] {};
 };
 
 #endif //INTEL8080_INTEL8080_H
