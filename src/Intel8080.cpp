@@ -96,9 +96,6 @@ constexpr int opcode[256] {
         58, 64, 54, 69, 56, 62, 42, 59, 58, 3, 54, 68, 56, 55, 45, 59,
 };
 
-// forward declaring helper function
-bool parityOf(std::uint8_t x);
-
 /**
  * Loop Logic Credit: https://floooh.github.io/2021/12/17/cycle-stepped-z80.html#pin-timing-differences-to-a-real-z80
  */
@@ -733,31 +730,29 @@ void Intel8080::tick()
         // DAD (cheating by using integers)
         case 146: case 147: case 148: case 149: case 150: case 151: goto next;
         case 152: {
-            std::uint16_t hl {pair_[HL]};
-            std::uint16_t rp {pair_[rp_()]};
-            setCarryFlag(hl + rp > 0xFFFF);
-            pair_[HL] = hl + rp;
+            setCarryFlag(pair_[HL] + pair_[rp_()] > 0xFFFF);
+            pair_[HL] = pair_[HL] + pair_[rp_()];
             goto done;
         }
 
         // DAA
-        case 153:
-            if ((a_ & 0xF) > 9 or ac()) {
-                a_ += 6U;
-                setAuxCarryFlag(true);
-            } else {
-                setAuxCarryFlag(false);
-            }
+        case 153: {
+            std::uint8_t addend {0};
+            std::uint8_t msb {static_cast<uint8_t>(a_ & 0xF0)}, lsb {static_cast<uint8_t>(a_ & 0xF)};
 
-            if ((a_ & 0xF0) > 0x90 or cy()) {
-                a_ += 0x60U;
+            if (lsb > 9 or ac())
+                addend = 6U;
+            setAuxCarryFlag(lsb + addend > 0xF);
+
+            if (msb > 0x90 or cy() or (msb >= 0x90 and lsb > 0)) {
+                addend += 0x60U;
                 setCarryFlag(true);
-            } else {
-                setCarryFlag(false);
             }
 
+            a_ += addend;
             zspFlags(a_);
             goto done;
+        }
 
         // ANA r
         case 154:
@@ -1363,7 +1358,7 @@ void Intel8080::tick()
             if (waiting_()) goto wait;
             else {
                 stopDataIn();
-                f_ = getDBus();
+                f_ = getDBus() & 0b11010111 | 0b10; // bits 3 and 5 are always zero, bit 2 is always one
                 goto next;
             }
         case 291:
@@ -1673,6 +1668,9 @@ inline void Intel8080::writeT2_(const std::uint8_t r)
     setDBus(r);
 }
 
+// forward declaring flag helper function
+bool parityOf(std::uint8_t x);
+
 inline void Intel8080::add(const std::uint8_t addend)
 {
     carryFlagsAdd(addend);
@@ -1714,7 +1712,7 @@ inline std::uint8_t Intel8080::inr(std::uint8_t operand)
 inline std::uint8_t Intel8080::dcr(std::uint8_t operand)
 {
     --operand;
-    setAuxCarryFlag((operand & 0xFU) != 0);
+    setAuxCarryFlag((operand & 0xFU) != 0xF);
     zspFlags(operand);
     return operand;
 }
@@ -1728,7 +1726,7 @@ inline void Intel8080::ana(const std::uint8_t operand)
 
 inline void Intel8080::ani(const std::uint8_t operand)
 {
-    carryFlagsAlg();
+    carryFlagsAnd(operand);
     a_ &= operand;
     zspFlags(a_);
 }

@@ -56,7 +56,7 @@ static constexpr std::string disassambleTable[256] = {
         "rst 5", "rp", "pop psw", "jp $", "di", "cp $", "push psw", "ori #",
         "rst 6", "rm", "sphl", "jm $", "ei", "cm $", "ill", "cpi #", "rst 7"};
 
-void log (Intel8080& intel8080, const Memory& memory, unsigned long currentCycle)
+void log (Intel8080& intel8080, const Memory& memory, unsigned long long currentCycle)
 {
     std::cout << std::format(
             "PC: {:0>4X}, AF: {:0>4X}, BC: {:0>4X}, DE: {:0>4X}, HL: {:0>4X}, SP: {:0>4X}, CYC: {:d}\t({:0>2X} {:0>2X} {:0>2X} {:0>2X}) - {:s}\n",
@@ -86,7 +86,7 @@ int loadFile(Memory& memory, const std::string& path, int addr)
     return 0;
 }
 
-void test(Intel8080& intel8080, const std::string& testName, unsigned long expectedCycles, bool debug, bool verbose)
+void test(Intel8080& intel8080, const std::string& testName, unsigned long long expectedCycles, bool debug, bool verbose)
 {
     Memory memory {};
     if (loadFile(memory, testDirectory + testName, 0x100) < 0)
@@ -107,8 +107,8 @@ void test(Intel8080& intel8080, const std::string& testName, unsigned long expec
     intel8080.pc = 0x100U;
 
     bool testRunning {true};
-    unsigned long executedCycles {0};
-    long instructions {0};
+    unsigned long long executedCycles {0};
+    unsigned long instructions {0};
     std::chrono::steady_clock::time_point begin {std::chrono::steady_clock::now()};
 
     while (testRunning) {
@@ -186,7 +186,7 @@ void test(Intel8080& intel8080, const std::string& testName, unsigned long expec
     }
     ++executedCycles; // +1 because loop ended on last cycle
 
-    long long diff {expectedCycles > executedCycles ? expectedCycles - executedCycles : executedCycles - expectedCycles};
+    unsigned long long diff {expectedCycles > executedCycles ? expectedCycles - executedCycles : executedCycles - expectedCycles};
     std::cout << std::format("\n*** {:d} instructions executed on {:d} cycles (expected={:d}, diff={:d}) in {:d}ms\n\n",
            instructions, executedCycles, expectedCycles, diff,
            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - begin).count());
@@ -213,10 +213,10 @@ int main(int argc, char** argv)
     Intel8080 intel8080 {};
     std::chrono::steady_clock::time_point begin {std::chrono::steady_clock::now()};
 
-    test(intel8080, "TST8080.COM", 4924LU, debug, verbose);
-    //test(intel8080, "8080PRE.COM", 7817LU, debug);
-    //test(intel8080, "CPUTEST.COM", 255653383LU, debug);
-    //test(intel8080, "8080EXM.COM", 23803381171LU, debug);
+    test(intel8080, "TST8080.COM", 4924ULL, debug, verbose);
+    test(intel8080, "8080PRE.COM", 7817ULL, debug, verbose);
+    test(intel8080, "CPUTEST.COM", 255653383ULL, debug, verbose);
+    //test(intel8080, "8080EXM.COM", 23803381171ULL, debug, verbose);
 
     std::cout << "Total time elapsed " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - begin).count() << "ms" << std::endl;
 
