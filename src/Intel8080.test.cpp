@@ -56,6 +56,8 @@ static constexpr std::string disassambleTable[256] = {
         "rst 5", "rp", "pop psw", "jp $", "di", "cp $", "push psw", "ori #",
         "rst 6", "rm", "sphl", "jm $", "ei", "cm $", "ill", "cpi #", "rst 7"};
 
+bool testRunning {true}; // flag needed by two functions could pass by reference but im lazy
+
 void log (Intel8080& intel8080, const Memory& memory, unsigned long long currentCycle)
 {
     std::cout << std::format(
@@ -86,6 +88,82 @@ int loadFile(Memory& memory, const std::string& path, int addr)
     return 0;
 }
 
+std::string t(std::chrono::steady_clock::time_point begin, std::chrono::steady_clock::time_point end)
+{
+    auto ms {std::chrono::duration_cast<std::chrono::milliseconds>(end - begin)};
+
+    if (ms.count() >= 60 * 1e3L) {
+        std::string min {std::to_string(std::chrono::duration_cast<std::chrono::minutes>(ms).count())};
+        std::string sec {std::to_string(std::chrono::duration_cast<std::chrono::seconds>(ms).count())};
+        return  min + '.' + sec.erase(0, 1) + " min";
+    } else if (ms.count() >= 1e3L) {
+        std::string sec {std::to_string(std::chrono::duration_cast<std::chrono::seconds>(ms).count())};
+        return  sec + '.' + std::to_string(ms.count()).erase(0, 1) + " sec";
+    } else {
+        return std::to_string(ms.count()) + " ms";
+    }
+}
+
+void onDataInput(Intel8080& intel8080, Memory& memory, bool debug, bool verbose)
+{
+    if (intel8080.status == MachineCycle::instructionFetch) {
+        intel8080.setDBus(memory[intel8080.getABus()]);
+        if (debug and verbose)
+            std::cout << std::format(
+                    "\tFETCH CYCLE\t[{:s}]: abus={:0>4X}, dbus={:0>2X}\n",
+                    disassambleTable[memory[intel8080.getABus()]],
+                    intel8080.getABus(),
+                    intel8080.getDBus());
+    } else if (intel8080.status == MachineCycle::memoryRead or intel8080.status == MachineCycle::stackRead) {
+        intel8080.setDBus(memory[intel8080.getABus()]);
+        if (debug and verbose)
+            std::cout << std::format(
+                    "\tREAD CYCLE\t[{:s}]: abus={:0>4X}, dbus={:0>2X}\n",
+                    disassambleTable[intel8080.ir],
+                    intel8080.getABus(),
+                    intel8080.getDBus());
+    } else if (intel8080.status == MachineCycle::inputRead) {
+        intel8080.setDBus(0ULL);
+    } else {
+        std::cout << std::format("error: unrecognized status word with DBIN pin high '{:b}' - {:s}\n",
+                                 intel8080.status, disassambleTable[intel8080.ir]);
+    }
+}
+
+void onDataOutput(Intel8080& intel8080, Memory& memory, bool debug, bool verbose)
+{
+    if (intel8080.status == MachineCycle::memoryWrite or intel8080.status == MachineCycle::stackWrite) {
+        memory[intel8080.getABus()] = intel8080.getDBus();
+        if (debug and verbose)
+            std::cout << std::format(
+                    "\tWRITE CYCLE\t[{:s}]: abus={:0>4X}, dbus={:0>2X}, mem={:0>2X}\n",
+                    disassambleTable[intel8080.ir],
+                    intel8080.getABus(),
+                    intel8080.getDBus(),
+                    memory[intel8080.getABus()]);
+    } else if (intel8080.status == MachineCycle::outputWrite) {
+        std::uint16_t port{intel8080.getABus()};
+        if (port == 0) {
+            testRunning = false;
+        } else if (port == 1) {
+            const std::uint8_t operation{intel8080.getReg(Intel8080::C)};
+            if (operation == 9) {
+                // print from memory at (DE) until '$' char
+                std::uint16_t addr{intel8080.getPair(Intel8080::DE)};
+                do {
+                    std::cout << (char) memory[addr++];
+                } while (memory[addr] != '$');
+            } else if (operation == 2 or operation == 5) {
+                // print a character stored in E
+                std::cout << (char) intel8080.getReg(Intel8080::E);
+            }
+        }
+    } else {
+        std::cout << std::format("error: unrecognized status word with WR pin high '{:b}' - {:s}\n",
+                                 intel8080.status, disassambleTable[intel8080.ir]);
+    }
+}
+
 void test(Intel8080& intel8080, const std::string& testName, unsigned long long expectedCycles, bool debug, bool verbose)
 {
     Memory memory {};
@@ -105,8 +183,8 @@ void test(Intel8080& intel8080, const std::string& testName, unsigned long long 
     // reset the cpu for the next test
     intel8080.reset();
     intel8080.pc = 0x100U;
+    testRunning = true;
 
-    bool testRunning {true};
     unsigned long long executedCycles {0};
     unsigned long instructions {0};
     std::chrono::steady_clock::time_point begin {std::chrono::steady_clock::now()};
@@ -115,81 +193,24 @@ void test(Intel8080& intel8080, const std::string& testName, unsigned long long 
         intel8080.tick();
         ++executedCycles;
 
-        switch (intel8080.status) {
-            case MachineCycle::instructionFetch:
-                if (intel8080.pins & Intel8080::SYNC) {
-                    ++instructions;
-                    if (debug)
-                        log(intel8080, memory,  executedCycles);
-                } else if (intel8080.pins & Intel8080::DBIN) {
-                    intel8080.setDBus(memory[intel8080.getABus()]);
-                    if (debug and verbose)
-                        std::cout << std::format(
-                                "\tFETCH CYCLE\t[{:s}]: abus={:0>4X}, dbus={:0>2X}\n",
-                                disassambleTable[memory[intel8080.getABus()]],
-                                intel8080.getABus(),
-                                intel8080.getDBus());
-                }
-                break;
-            case MachineCycle::memoryRead: case MachineCycle::stackRead:
-                if (intel8080.pins & Intel8080::DBIN) {
-                    intel8080.setDBus(memory[intel8080.getABus()]);
-                    if (debug and verbose)
-                        std::cout << std::format(
-                                "\tREAD CYCLE\t[{:s}]: abus={:0>4X}, dbus={:0>2X}\n",
-                                disassambleTable[intel8080.ir],
-                                intel8080.getABus(),
-                                intel8080.getDBus());
-                }
-                break;
-            case MachineCycle::memoryWrite: case MachineCycle::stackWrite:
-                if (intel8080.pins & Intel8080::WR) {
-                    memory[intel8080.getABus()] = intel8080.getDBus();
-                    if (debug and verbose)
-                        std::cout << std::format(
-                                "\tWRITE CYCLE\t[{:s}]: abus={:0>4X}, dbus={:0>2X}, mem={:0>2X}\n",
-                                disassambleTable[intel8080.ir],
-                                intel8080.getABus(),
-                                intel8080.getDBus(),
-                                memory[intel8080.getABus()]);
-                }
-                break;
-            case MachineCycle::inputRead:
-                if (intel8080.pins & Intel8080::DBIN)
-                    intel8080.setDBus(0ULL);
-                break;
-            case MachineCycle::outputWrite:
-                if (intel8080.pins & Intel8080::WR) {
-                    std::uint16_t port {intel8080.getABus()};
-                    if (port == 0) {
-                        testRunning = false;
-                    } else if (port == 1) {
-                        const std::uint8_t operation {intel8080.getReg(Intel8080::C)};
-                        if (operation == 9) { // print from memory at (DE) until '$' char
-                            std::uint16_t addr {intel8080.getPair(Intel8080::DE)};
-                            do {
-                                std::cout << (char) memory[addr++];
-                            } while (memory[addr] != '$');
-                        } else if (operation == 2 or operation == 5) { // print a character stored in E
-                            std::cout << (char) intel8080.getReg(Intel8080::E);
-                        }
-                    }
-                }
-                break;
-            case MachineCycle::interruptAck: case MachineCycle::haltAck: case MachineCycle::interruptAckWhileHalt:
-                // interrupt+halts acknowledges not implemented
-                break;
-            default:
-                std::cerr << std::format("\tUnrecognized machine cycle status word '{:b}'\n", intel8080.status);
-                break;
+        if (intel8080.pins & Intel8080::SYNC and intel8080.status == MachineCycle::instructionFetch) {
+            ++instructions;
+            if (debug)
+                log(intel8080, memory, executedCycles);
+        } else if (intel8080.pins & Intel8080::DBIN) {
+            onDataInput(intel8080, memory, debug, verbose);
+        } else if (intel8080.pins & Intel8080::WR) {
+            onDataOutput(intel8080, memory, debug, verbose);
         }
     }
-    ++executedCycles; // +1 because loop ended on last cycle
+    // need to tick() one more time because the test ended before the cpu could finish its last cycle
+    intel8080.tick();
+    ++executedCycles;
 
     unsigned long long diff {expectedCycles > executedCycles ? expectedCycles - executedCycles : executedCycles - expectedCycles};
-    std::cout << std::format("\n*** {:d} instructions executed on {:d} cycles (expected={:d}, diff={:d}) in {:d}ms\n\n",
+    std::cout << std::format("\n*** {:d} instructions executed on {:d} cycles (expected={:d}, diff={:d}) in {:s}\n\n",
            instructions, executedCycles, expectedCycles, diff,
-           std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - begin).count());
+                             t(begin, std::chrono::steady_clock::now()));
 }
 
 int main(int argc, char** argv)
@@ -216,9 +237,9 @@ int main(int argc, char** argv)
     test(intel8080, "TST8080.COM", 4924ULL, debug, verbose);
     test(intel8080, "8080PRE.COM", 7817ULL, debug, verbose);
     test(intel8080, "CPUTEST.COM", 255653383ULL, debug, verbose);
-    //test(intel8080, "8080EXM.COM", 23803381171ULL, debug, verbose);
+    test(intel8080, "8080EXM.COM", 23803381171ULL, debug, verbose);
 
-    std::cout << "Total time elapsed " << std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - begin).count() << "ms" << std::endl;
+    std::cout << "Done. Total time elapsed " << t(begin, std::chrono::steady_clock::now()) << std::endl;
 
     return 0;
 }

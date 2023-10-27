@@ -744,7 +744,7 @@ void Intel8080::tick()
                 addend = 6U;
             setAuxCarryFlag(lsb + addend > 0xF);
 
-            if (msb > 0x90 or cy() or (msb >= 0x90 and lsb > 0)) {
+            if (msb > 0x90 or cy() or (msb >= 0x90 and lsb > 9)) {
                 addend += 0x60U;
                 setCarryFlag(true);
             }
@@ -949,7 +949,7 @@ void Intel8080::tick()
 
         // CMC
         case 195:
-            setCarryFlag(cy() == 0);
+            setCarryFlag(!cy());
             goto done;
 
         // STC
@@ -1704,7 +1704,7 @@ inline void Intel8080::sbb(const std::uint8_t subtrahend)
 inline std::uint8_t Intel8080::inr(std::uint8_t operand)
 {
     ++operand;
-    setAuxCarryFlag((operand & 0xFU) == 0);
+    setAuxCarryFlag((operand & 0xFU) == 0); // only case for half carry is 01111 + 1 = 10000
     zspFlags(operand);
     return operand;
 }
@@ -1712,7 +1712,7 @@ inline std::uint8_t Intel8080::inr(std::uint8_t operand)
 inline std::uint8_t Intel8080::dcr(std::uint8_t operand)
 {
     --operand;
-    setAuxCarryFlag((operand & 0xFU) != 0xF);
+    setAuxCarryFlag((operand & 0xFU) != 0xF); // only case for half borrow is 10000 - 1 = 01111
     zspFlags(operand);
     return operand;
 }

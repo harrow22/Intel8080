@@ -45,14 +45,14 @@ public:
     static constexpr std::uint_fast64_t A13 {1ULL << 13ULL};
     static constexpr std::uint_fast64_t A14 {1ULL << 14ULL};
     static constexpr std::uint_fast64_t A15 {1ULL << 15ULL};
-    static constexpr std::uint_fast64_t INTA {1ULL << 16ULL};
-    static constexpr std::uint_fast64_t WO {1ULL << 17ULL};
-    static constexpr std::uint_fast64_t STACK {1ULL << 18ULL};
-    static constexpr std::uint_fast64_t HLTA {1ULL << 19ULL};
-    static constexpr std::uint_fast64_t OUT {1ULL << 20ULL};
-    static constexpr std::uint_fast64_t M1 {1ULL << 21ULL};
-    static constexpr std::uint_fast64_t INP {1ULL << 22ULL};
-    static constexpr std::uint_fast64_t MEMR {1ULL << 23ULL};
+    static constexpr std::uint_fast64_t INTA {1ULL << 16ULL};   // D0
+    static constexpr std::uint_fast64_t WO {1ULL << 17ULL};     // D1
+    static constexpr std::uint_fast64_t STACK {1ULL << 18ULL};  // D2
+    static constexpr std::uint_fast64_t HLTA {1ULL << 19ULL};   // D3
+    static constexpr std::uint_fast64_t OUT {1ULL << 20ULL};    // D4
+    static constexpr std::uint_fast64_t M1 {1ULL << 21ULL};     // D5
+    static constexpr std::uint_fast64_t INP {1ULL << 22ULL};    // D6
+    static constexpr std::uint_fast64_t MEMR {1ULL << 23ULL};   // D7
     static constexpr std::uint_fast64_t INTE {1ULL << 24ULL};
     static constexpr std::uint_fast64_t DBIN {1ULL << 25ULL};
     static constexpr std::uint_fast64_t WR {1ULL << 26ULL};
@@ -209,7 +209,7 @@ private:
     void stopDataIn() { pins &= ~DBIN; }
     void stopDataOut() { pins &= ~WR; }
     [[nodiscard]] bool waiting_() const { return pins & WAIT; }
-    [[nodiscard]] bool interrupted_() const { return pins & (INT | INTE); }
+    [[nodiscard]] bool interrupted_() const { return (pins & INT) != 0 and pins & INTE; }
 
     // helper functions
     void setReg(std::uint8_t, std::uint8_t);

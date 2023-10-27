@@ -16,6 +16,7 @@ target_include_directories(Intel8080
 add_executable(Intel8080_test
         src/Intel8080.test.cpp
 )
+
 target_link_libraries(Intel8080_test
         PRIVATE
         Intel8080
