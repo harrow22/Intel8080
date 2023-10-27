@@ -96,33 +96,41 @@ constexpr int opcode[256] {
         58, 64, 54, 69, 56, 62, 42, 59, 58, 3, 54, 68, 56, 55, 45, 59,
 };
 
-/**
- * Loop Logic Credit: https://floooh.github.io/2021/12/17/cycle-stepped-z80.html#pin-timing-differences-to-a-real-z80
- */
 void Intel8080::tick()
 {
-    if (stopped) {
-        if (!interrupted_())
-            return;
-        stopped = false;
+    if (pins & INT and pins & INTE) {
+        intff_ = true;
+        if (stopped_) {
+            stopped_ = false;
+            intWhileHalt_ = true;
+        }
     }
+    if (stopped_) return;
 
     switch (step_) {
         // instruction fetch
         case 0:
-            fetchT1_();
-            if (interrupted_())
-                pins |= INTA;
+            setABus_(pc);
+            if (intff_) {
+                setDBus(INTA|WO|M1);
+                if (intWhileHalt_) {
+                    intWhileHalt_ = false;
+                    pins |= HLTA;
+                }
+                pins &= ~INTE;
+            } else {
+                setDBus(WO|M1|MEMR);
+            }
+            t1_();
             goto next;
         case 1:
             readT2_();
-            if (!interrupted_())
-                ++pc;
+            intff_ ? intff_ = false : ++pc;
             goto next;
         case 2:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 ir_ = getDBus();
                 step_ = mnemonic[opcode[ir_]];
                 return;
@@ -131,12 +139,13 @@ void Intel8080::tick()
         // MOV r1, r2
         case 3: goto next;
         case 4:
-            setReg(dst_(), getReg(src_()));
+            setReg_(dst_(), getReg(src_()));
             goto done;
 
         // MOV r, M
         case 5: goto next;
-        case 6: readT1_(pair_[HL]);
+        case 6:
+            readT1_(pair_[HL]);
             goto next;
         case 7:
             readT2_();
@@ -144,8 +153,8 @@ void Intel8080::tick()
         case 8:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
-                setReg(dst_(), getDBus());
+                stopDataIn_();
+                setReg_(dst_(), getDBus());
                 goto done;
             }
 
@@ -160,7 +169,7 @@ void Intel8080::tick()
         case 12:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto done;
             }
 
@@ -182,8 +191,8 @@ void Intel8080::tick()
         case 18:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
-                setReg(dst_(), getDBus());
+                stopDataIn_();
+                setReg_(dst_(), getDBus());
                 goto done;
             }
 
@@ -199,7 +208,7 @@ void Intel8080::tick()
         case 22:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
                 goto next;
             }
@@ -212,7 +221,7 @@ void Intel8080::tick()
         case 25:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto done;
             }
 
@@ -228,7 +237,7 @@ void Intel8080::tick()
         case 29:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setLo_(rp_(), getDBus());
                 goto next;
             }
@@ -242,7 +251,7 @@ void Intel8080::tick()
         case 32:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setHi_(rp_(), getDBus());
                 goto done;
             }
@@ -259,7 +268,7 @@ void Intel8080::tick()
         case 36:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setLo_(WZ, getDBus());
                 goto next;
             }
@@ -273,7 +282,7 @@ void Intel8080::tick()
         case 39:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setHi_(WZ, getDBus());
                 goto next;
             }
@@ -286,7 +295,7 @@ void Intel8080::tick()
         case 42:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 a_ = getDBus();
                 goto done;
             }
@@ -303,7 +312,7 @@ void Intel8080::tick()
         case 46:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setLo_(WZ, getDBus());
                 goto next;
             }
@@ -317,7 +326,7 @@ void Intel8080::tick()
         case 49:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setHi_(WZ, getDBus());
                 goto next;
             }
@@ -330,7 +339,7 @@ void Intel8080::tick()
         case 52:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto done;
             }
 
@@ -346,7 +355,7 @@ void Intel8080::tick()
         case 56:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setLo_(WZ, getDBus());
                 goto next;
             }
@@ -360,7 +369,7 @@ void Intel8080::tick()
         case 59:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setHi_(WZ, getDBus());
                 goto next;
             }
@@ -374,7 +383,7 @@ void Intel8080::tick()
         case 62:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setLo_(HL, getDBus());
                 goto next;
             }
@@ -387,7 +396,7 @@ void Intel8080::tick()
         case 65:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setHi_(HL, getDBus());
                 goto done;
             }
@@ -404,7 +413,7 @@ void Intel8080::tick()
         case 69:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setLo_(WZ,getDBus());
                 goto next;
             }
@@ -418,7 +427,7 @@ void Intel8080::tick()
         case 72:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setHi_(WZ, getDBus());
                 goto next;
             }
@@ -432,7 +441,7 @@ void Intel8080::tick()
         case 75:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto next;
             }
         case 76:
@@ -444,7 +453,7 @@ void Intel8080::tick()
         case 78:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto done;
             }
 
@@ -459,7 +468,7 @@ void Intel8080::tick()
         case 82:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 a_ = getDBus();
                 goto done;
             }
@@ -475,7 +484,7 @@ void Intel8080::tick()
         case 86:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto done;
             }
 
@@ -489,7 +498,7 @@ void Intel8080::tick()
         // my emulator cheats by not overlapping instructions with the next fetch/decode cycle
         // ADD r
         case 88:
-            add(getReg(src_()));
+            add_(getReg(src_()));
             goto done;
 
         // ADD M
@@ -503,9 +512,9 @@ void Intel8080::tick()
         case 92:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
-                add(tmp_);
+                add_(tmp_);
                 goto done;
             }
 
@@ -521,15 +530,15 @@ void Intel8080::tick()
         case 96:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
-                add(tmp_);
+                add_(tmp_);
                 goto done;
             }
 
         // ADC r
         case 97:
-            adc(getReg(src_()));
+            adc_(getReg(src_()));
             goto done;
 
         // ADC M
@@ -543,9 +552,9 @@ void Intel8080::tick()
         case 101:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
-                adc(tmp_);
+                adc_(tmp_);
                 goto done;
             }
 
@@ -561,15 +570,15 @@ void Intel8080::tick()
         case 105:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
-                adc(tmp_);
+                adc_(tmp_);
                 goto done;
             }
 
         // SUB r
         case 106:
-            sub(getReg(src_()));
+            sub_(getReg(src_()));
             goto done;
 
         // SUB M
@@ -583,9 +592,9 @@ void Intel8080::tick()
         case 110:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
-                sub(tmp_);
+                sub_(tmp_);
                 goto done;
             }
 
@@ -601,15 +610,15 @@ void Intel8080::tick()
         case 114:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
-                sub(tmp_);
+                sub_(tmp_);
                 goto done;
             }
 
         // SBB r
         case 115:
-            sbb(getReg(src_()));
+            sbb_(getReg(src_()));
             goto done;
 
         // SBB M
@@ -623,9 +632,9 @@ void Intel8080::tick()
         case 119:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
-                sbb(tmp_);
+                sbb_(tmp_);
                 goto done;
             }
 
@@ -641,16 +650,16 @@ void Intel8080::tick()
         case 123:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
-                sbb(tmp_);
+                sbb_(tmp_);
                 goto done;
             }
 
         // INR r
         case 124: goto next;
         case 125:
-            setReg(dst_(), inr(getReg(dst_())));
+            setReg_(dst_(), inr_(getReg(dst_())));
             goto done;
 
         // INR M
@@ -664,7 +673,7 @@ void Intel8080::tick()
         case 129:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
                 goto next;
             }
@@ -672,19 +681,19 @@ void Intel8080::tick()
             writeT1_(pair_[HL]);
             goto next;
         case 131:
-            writeT2_(inr(tmp_));
+            writeT2_(inr_(tmp_));
             goto next;
         case 132:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto done;
             }
 
         // DCR r
         case 133: goto next;
         case 134:
-            setReg(dst_(), dcr(getReg(dst_())));
+            setReg_(dst_(), dcr_(getReg(dst_())));
             goto done;
 
         // DCR M
@@ -698,7 +707,7 @@ void Intel8080::tick()
         case 138:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
                 goto next;
             }
@@ -706,12 +715,12 @@ void Intel8080::tick()
             writeT1_(pair_[HL]);
             goto next;
         case 140:
-            writeT2_(dcr(tmp_));
+            writeT2_(dcr_(tmp_));
             goto next;
         case 141:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto done;
             }
 
@@ -730,7 +739,7 @@ void Intel8080::tick()
         // DAD (cheating by using integers)
         case 146: case 147: case 148: case 149: case 150: case 151: goto next;
         case 152: {
-            setCarryFlag(pair_[HL] + pair_[rp_()] > 0xFFFF);
+            setCarryFlag_(pair_[HL] + pair_[rp_()] > 0xFFFF);
             pair_[HL] = pair_[HL] + pair_[rp_()];
             goto done;
         }
@@ -742,21 +751,21 @@ void Intel8080::tick()
 
             if (lsb > 9 or ac())
                 addend = 6U;
-            setAuxCarryFlag(lsb + addend > 0xF);
+            setAuxCarryFlag_(lsb + addend > 0xF);
 
             if (msb > 0x90 or cy() or (msb >= 0x90 and lsb > 9)) {
                 addend += 0x60U;
-                setCarryFlag(true);
+                setCarryFlag_(true);
             }
 
             a_ += addend;
-            zspFlags(a_);
+            zspFlags_(a_);
             goto done;
         }
 
         // ANA r
         case 154:
-            ana(getReg(src_()));
+            ana_(getReg(src_()));
             goto done;
 
         // ANA M
@@ -770,9 +779,9 @@ void Intel8080::tick()
         case 158:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
-                ana(tmp_);
+                ana_(tmp_);
                 goto done;
             }
 
@@ -788,15 +797,15 @@ void Intel8080::tick()
         case 162:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
-                ani(tmp_);
+                ani_(tmp_);
                 goto done;
             }
 
         // XRA data
         case 163:
-            xra(getReg(src_()));
+            xra_(getReg(src_()));
             goto done;
 
         // XRA M
@@ -810,9 +819,9 @@ void Intel8080::tick()
         case 167:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
-                xra(tmp_);
+                xra_(tmp_);
                 goto done;
             }
 
@@ -828,15 +837,15 @@ void Intel8080::tick()
         case 171:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
-                xra(tmp_);
+                xra_(tmp_);
                 goto done;
             }
 
         // ORA r
         case 172:
-            ora(getReg(src_()));
+            ora_(getReg(src_()));
             goto done;
 
         // ORA M
@@ -850,9 +859,9 @@ void Intel8080::tick()
         case 176:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
-                ora(tmp_);
+                ora_(tmp_);
                 goto done;
             }
 
@@ -868,15 +877,15 @@ void Intel8080::tick()
         case 180:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
-                ora(tmp_);
+                ora_(tmp_);
                 goto done;
             }
 
         // CMP r
         case 181:
-            cmp(getReg(src_()));
+            cmp_(getReg(src_()));
             goto done;
 
         // CMP M
@@ -890,9 +899,9 @@ void Intel8080::tick()
         case 185:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
-                cmp(tmp_);
+                cmp_(tmp_);
                 goto done;
             }
 
@@ -908,28 +917,28 @@ void Intel8080::tick()
         case 189:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 tmp_ = getDBus();
-                cmp(tmp_);
+                cmp_(tmp_);
                 goto done;
             }
 
         // RLC
         case 190:
-            setCarryFlag(a_ & 0x80);
+            setCarryFlag_(a_ & 0x80);
             a_ = (a_ << 1U) | cy();
             goto done;
 
         // RRC
         case 191:
-            setCarryFlag(a_ & 0x01);
+            setCarryFlag_(a_ & 0x01);
             a_ = (a_ >> 1U) | (cy() << 7U);
             goto done;
 
         // RAL
         case 192: {
             const std::uint8_t carry {cy()};
-            setCarryFlag(a_ & 0x80);
+            setCarryFlag_(a_ & 0x80);
             a_ = (a_ << 1U) | carry;
             goto done;
         }
@@ -937,7 +946,7 @@ void Intel8080::tick()
         // RAR
         case 193: {
             const std::uint8_t carry {cy()};
-            setCarryFlag(a_ & 0x01);
+            setCarryFlag_(a_ & 0x01);
             a_ = (a_ >> 1U) | (carry << 7U);
             goto done;
         }
@@ -949,12 +958,12 @@ void Intel8080::tick()
 
         // CMC
         case 195:
-            setCarryFlag(!cy());
+            setCarryFlag_(!cy());
             goto done;
 
         // STC
         case 196:
-            setCarryFlag(true);
+            setCarryFlag_(true);
             goto done;
 
         // JMP addr
@@ -969,7 +978,7 @@ void Intel8080::tick()
         case 200:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setLo_(WZ, getDBus());
                 goto next;
             }
@@ -983,7 +992,7 @@ void Intel8080::tick()
         case 203:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setHi_(WZ, getDBus());
                 pc = pair_[WZ];
                 goto done;
@@ -1001,7 +1010,7 @@ void Intel8080::tick()
         case 207:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setLo_(WZ, getDBus());
                 goto next;
             }
@@ -1015,7 +1024,7 @@ void Intel8080::tick()
         case 210:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setHi_(WZ, getDBus());
                 if (ccc_())
                     pc = pair_[WZ];
@@ -1037,7 +1046,7 @@ void Intel8080::tick()
         case 215:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setLo_(WZ, getDBus());
                 goto next;
             }
@@ -1051,7 +1060,7 @@ void Intel8080::tick()
         case 218:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setHi_(WZ, getDBus());
                 goto next;
             }
@@ -1065,7 +1074,7 @@ void Intel8080::tick()
         case 221:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto next;
             }
         case 222:
@@ -1077,7 +1086,7 @@ void Intel8080::tick()
         case 224:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 pc = pair_[WZ];
                 goto done;
             }
@@ -1098,7 +1107,7 @@ void Intel8080::tick()
         case 229:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setLo_(WZ, getDBus());
                 goto next;
             }
@@ -1112,7 +1121,7 @@ void Intel8080::tick()
         case 232:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setHi_(WZ, getDBus());
                 if (ccc_())
                     goto next;
@@ -1128,7 +1137,7 @@ void Intel8080::tick()
         case 235:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto next;
             }
         case 236:
@@ -1140,7 +1149,7 @@ void Intel8080::tick()
         case 238:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 pc = pair_[WZ];
                 goto done;
             }
@@ -1157,7 +1166,7 @@ void Intel8080::tick()
         case 242:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setLo_(WZ, getDBus());
                 goto next;
             }
@@ -1171,7 +1180,7 @@ void Intel8080::tick()
         case 245:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setHi_(WZ, getDBus());
                 pc = pair_[WZ];
                 goto done;
@@ -1193,7 +1202,7 @@ void Intel8080::tick()
         case 250:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setLo_(WZ, getDBus());
                 goto next;
             }
@@ -1207,7 +1216,7 @@ void Intel8080::tick()
         case 253:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setHi_(WZ, getDBus());
                 pc = pair_[WZ];
                 goto done;
@@ -1228,7 +1237,7 @@ void Intel8080::tick()
         case 258:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto next;
             }
         case 259:
@@ -1240,7 +1249,7 @@ void Intel8080::tick()
         case 261:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 pair_[WZ] = nnn_() * 8U;
                 pc = pair_[WZ];
                 goto done;
@@ -1267,7 +1276,7 @@ void Intel8080::tick()
         case 268:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto next;
             }
         case 269:
@@ -1279,7 +1288,7 @@ void Intel8080::tick()
         case 271:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto done;
             }
 
@@ -1298,7 +1307,7 @@ void Intel8080::tick()
         case 276:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto next;
             }
         case 277:
@@ -1310,7 +1319,7 @@ void Intel8080::tick()
         case 279:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto done;
             }
 
@@ -1326,7 +1335,7 @@ void Intel8080::tick()
         case 283:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setLo_(rp_(), getDBus());
                 goto next;
             }
@@ -1340,7 +1349,7 @@ void Intel8080::tick()
         case 286:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setHi_(rp_(), getDBus());
                 goto done;
             }
@@ -1357,7 +1366,7 @@ void Intel8080::tick()
         case 290:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 f_ = getDBus() & 0b11010111 | 0b10; // bits 3 and 5 are always zero, bit 2 is always one
                 goto next;
             }
@@ -1371,7 +1380,7 @@ void Intel8080::tick()
         case 293:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 a_ = getDBus();
                 goto done;
             }
@@ -1387,7 +1396,7 @@ void Intel8080::tick()
         case 297:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setLo_(WZ, getDBus());
                 goto next;
             }
@@ -1400,7 +1409,7 @@ void Intel8080::tick()
         case 300:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 setHi_(WZ, getDBus());
                 goto next;
             }
@@ -1413,7 +1422,7 @@ void Intel8080::tick()
         case 303:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto next;
             }
         case 304:
@@ -1425,7 +1434,7 @@ void Intel8080::tick()
         case 306:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto next;
             }
         case 307: goto next;
@@ -1445,7 +1454,7 @@ void Intel8080::tick()
         case 312:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 pair_[WZ] = getDBus();
                 goto next;
             }
@@ -1458,7 +1467,7 @@ void Intel8080::tick()
         case 315:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 a_ = getDBus();
                 goto done;
             }
@@ -1475,7 +1484,7 @@ void Intel8080::tick()
         case 319:
             if (waiting_()) goto wait;
             else {
-                stopDataIn();
+                stopDataIn_();
                 pair_[WZ] = getDBus();
                 goto next;
             }
@@ -1488,7 +1497,7 @@ void Intel8080::tick()
         case 322:
             if (waiting_()) goto wait;
             else {
-                stopDataOut();
+                stopDataOut_();
                 goto done;
             }
 
@@ -1505,17 +1514,19 @@ void Intel8080::tick()
         // HLT
         case 325: goto next;
         case 326:
+            setABus_(pc);
             setDBus(WO|HLTA|MEMR);
+            status = getDBus();
             goto next;
         case 327:
-            ++pc;
-            stopped = true;
+            stopped_ = true;
             goto done;
 
         // NOP
         case 328: goto done;
     }
 
+    // see (https://floooh.github.io/2021/12/17/cycle-stepped-z80.html)
     wait:
         if (pins & READY)
             pins &= ~WAIT;
@@ -1550,7 +1561,7 @@ bool Intel8080::ccc_() const {
     }
 }
 
-void Intel8080::setReg(const std::uint8_t r, const std::uint8_t val) {
+void Intel8080::setReg_(const std::uint8_t r, const std::uint8_t val) {
     switch (r) {
         case B: setHi_(BC, val); break;
         case C: setLo_(BC, val); break;
@@ -1582,68 +1593,61 @@ inline void Intel8080::t1_()
 {
     pins |= SYNC;
     status = getDBus(); // technically status is latched in phi1 of T2 but im not implementing two clocks
-    // and the status needs to be ready in the same phase as the SYNC signal
-}
-
-inline void Intel8080::fetchT1_()
-{
-    setABus(pc);
-    setDBus(WO|M1|MEMR);
-    t1_();
+                        // and the status needs to be ready in the same phase as the SYNC signal
 }
 
 inline void Intel8080::readT1_(const std::uint16_t addr)
 {
-    setABus(addr);
+    setABus_(addr);
     setDBus(WO|MEMR);
     t1_();
 }
 
 inline void Intel8080::writeT1_(const std::uint16_t addr)
 {
-    setABus(addr);
+    setABus_(addr);
     setDBus(0ULL);
     t1_();
 }
 
 inline void Intel8080::stackWriteT1_()
 {
-    setABus(pair_[SP]);
+    setABus_(pair_[SP]);
     setDBus(STACK);
     t1_();
 }
 
 inline void Intel8080::stackWriteT1_(const std::uint16_t addr)
 {
-    setABus(addr);
+    setABus_(addr);
     setDBus(STACK);
     t1_();
 }
 
 inline void Intel8080::stackReadT1_()
 {
-    setABus(pair_[SP]);
+    setABus_(pair_[SP]);
     setDBus(WO|STACK|MEMR);
     t1_();
 }
 
 inline void Intel8080::stackReadT1_(const std::uint16_t addr)
 {
-    setABus(addr);
+    setABus_(addr);
     setDBus(WO|STACK|MEMR);
     t1_();
 }
 
 inline void Intel8080::inputReadT1_()
 {
-    setABus(pair_[WZ]);
+    setABus_(pair_[WZ]);
     setDBus(WO|INP);
     t1_();
 }
 
 void Intel8080::outputWriteT1_()
 {
-    setABus(pair_[WZ]);
+    setABus_(pair_[WZ]);
     setDBus(OUT);
     t1_();
 }
@@ -1671,116 +1675,116 @@ inline void Intel8080::writeT2_(const std::uint8_t r)
 // forward declaring flag helper function
 bool parityOf(std::uint8_t x);
 
-inline void Intel8080::add(const std::uint8_t addend)
+inline void Intel8080::add_(const std::uint8_t addend)
 {
-    carryFlagsAdd(addend);
+    carryFlagsAdd_(addend);
     a_ += addend;
-    zspFlags(a_);
+    zspFlags_(a_);
 }
 
-inline void Intel8080::adc(const std::uint8_t addend)
+inline void Intel8080::adc_(const std::uint8_t addend)
 {
     std::uint8_t carry {cy()}; // need temp because carry is updated before accumulator
-    carryFlagsAdd(addend, carry);
+    carryFlagsAdd_(addend, carry);
     a_ += addend + carry;
-    zspFlags(a_);
+    zspFlags_(a_);
 }
 
-inline void Intel8080::sub(const std::uint8_t subtrahend)
+inline void Intel8080::sub_(const std::uint8_t subtrahend)
 {
-    carryFlagsSub(subtrahend);
+    carryFlagsSub_(subtrahend);
     a_ -= subtrahend;
-    zspFlags(a_);
+    zspFlags_(a_);
 }
 
-inline void Intel8080::sbb(const std::uint8_t subtrahend)
+inline void Intel8080::sbb_(const std::uint8_t subtrahend)
 {
     std::uint8_t carry {cy()}; // need temp because carry is updated before accumulator
-    carryFlagsSub(subtrahend, carry);
+    carryFlagsSub_(subtrahend, carry);
     a_ = a_ - subtrahend - carry;
-    zspFlags(a_);
+    zspFlags_(a_);
 }
 
-inline std::uint8_t Intel8080::inr(std::uint8_t operand)
+inline std::uint8_t Intel8080::inr_(std::uint8_t operand)
 {
     ++operand;
-    setAuxCarryFlag((operand & 0xFU) == 0); // only case for half carry is 01111 + 1 = 10000
-    zspFlags(operand);
+    setAuxCarryFlag_((operand & 0xFU) == 0); // only case for half carry is 01111 + 1 = 10000
+    zspFlags_(operand);
     return operand;
 }
 
-inline std::uint8_t Intel8080::dcr(std::uint8_t operand)
+inline std::uint8_t Intel8080::dcr_(std::uint8_t operand)
 {
     --operand;
-    setAuxCarryFlag((operand & 0xFU) != 0xF); // only case for half borrow is 10000 - 1 = 01111
-    zspFlags(operand);
+    setAuxCarryFlag_((operand & 0xFU) != 0xF); // only case for half borrow is 10000 - 1 = 01111
+    zspFlags_(operand);
     return operand;
 }
 
-inline void Intel8080::ana(const std::uint8_t operand)
+inline void Intel8080::ana_(const std::uint8_t operand)
 {
-    carryFlagsAnd(operand);
+    carryFlagsAnd_(operand);
     a_ &= operand;
-    zspFlags(a_);
+    zspFlags_(a_);
 }
 
-inline void Intel8080::ani(const std::uint8_t operand)
+inline void Intel8080::ani_(const std::uint8_t operand)
 {
-    carryFlagsAnd(operand);
+    carryFlagsAnd_(operand);
     a_ &= operand;
-    zspFlags(a_);
+    zspFlags_(a_);
 }
 
-inline void Intel8080::xra(const std::uint8_t operand)
+inline void Intel8080::xra_(const std::uint8_t operand)
 {
-    carryFlagsAlg();
+    carryFlagsAlg_();
     a_ ^= operand;
-    zspFlags(a_);
+    zspFlags_(a_);
 }
 
-inline void Intel8080::ora(const std::uint8_t operand)
+inline void Intel8080::ora_(const std::uint8_t operand)
 {
-    carryFlagsAlg();
+    carryFlagsAlg_();
     a_ |= operand;
-    zspFlags(a_);
+    zspFlags_(a_);
 }
 
-inline void Intel8080::cmp(const std::uint8_t operand)
+inline void Intel8080::cmp_(const std::uint8_t operand)
 {
-    carryFlagsSub(operand);
-    zspFlags(a_ - operand);
+    carryFlagsSub_(operand);
+    zspFlags_(a_ - operand);
 }
 
-inline void Intel8080::carryFlagsAlg() {
-    setAuxCarryFlag(false);
-    setCarryFlag(false);
+inline void Intel8080::carryFlagsAlg_() {
+    setAuxCarryFlag_(false);
+    setCarryFlag_(false);
 }
 
-inline void Intel8080::carryFlagsAnd(std::uint8_t operand)
+inline void Intel8080::carryFlagsAnd_(const std::uint8_t operand)
 {
-    setAuxCarryFlag((a_ | operand) & 0b1000U);
-    setCarryFlag(false);
+    setAuxCarryFlag_((a_ | operand) & 0b1000U);
+    setCarryFlag_(false);
 }
 
-inline void Intel8080::carryFlagsAdd(std::uint8_t addend, std::uint8_t cy)
+inline void Intel8080::carryFlagsAdd_(const std::uint8_t addend, std::uint8_t cy)
 {
     std::uint16_t res {static_cast<uint16_t>(a_ + addend + cy)};
-    setAuxCarryFlag((a_ ^ addend ^ res) & 0x10U);
-    setCarryFlag(res > 0xFF);
+    setAuxCarryFlag_((a_ ^ addend ^ res) & 0x10U);
+    setCarryFlag_(res > 0xFF);
 }
 
-inline void Intel8080::carryFlagsSub(std::uint8_t subtrahend, std::uint8_t cy)
+inline void Intel8080::carryFlagsSub_(const std::uint8_t subtrahend, std::uint8_t cy)
 {
     std::uint16_t res {static_cast<uint16_t>(a_ - subtrahend - cy)};
-    setAuxCarryFlag(~(a_ ^ subtrahend ^ res) & 0x10U);
-    setCarryFlag(a_ < subtrahend + cy);
+    setAuxCarryFlag_(~(a_ ^ subtrahend ^ res) & 0x10U);
+    setCarryFlag_(a_ < subtrahend + cy);
 }
 
-inline void Intel8080::zspFlags(std::uint8_t val)
+inline void Intel8080::zspFlags_(const std::uint8_t val)
 {
-    setZeroFlag(val == 0);
-    setSignFlag(val & 0x80U);
-    setParityFlag(parityOf(val));
+    setZeroFlag_(val == 0);
+    setSignFlag_(val & 0x80U);
+    setParityFlag_(parityOf(val));
 }
 
 bool parityOf(std::uint8_t x)

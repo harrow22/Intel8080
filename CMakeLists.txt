@@ -13,11 +13,7 @@ target_include_directories(Intel8080
         ${PROJECT_SOURCE_DIR}/include
 )
 
-add_executable(Intel8080_test
-        src/Intel8080.test.cpp
-)
-
-target_link_libraries(Intel8080_test
-        PRIVATE
-        Intel8080
-)
+option(INTEL8080_TESTS "Enable / Disable testing" ON)
+if (INTEL8080_TESTS)
+    add_subdirectory(tests)
+endif()

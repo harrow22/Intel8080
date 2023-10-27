@@ -23,12 +23,10 @@
  *   A14 ○<————│ 15             17 │<———>○ D0
  *   A15 ○<————│ 16                │
  *             └───────────────────┘
- * See README for usage.
  */
-
 class Intel8080 {
 public:
-    // pin bit constants
+    // address pins
     static constexpr std::uint_fast64_t A0 {1ULL << 0ULL};
     static constexpr std::uint_fast64_t A1 {1ULL << 1ULL};
     static constexpr std::uint_fast64_t A2 {1ULL << 2ULL};
@@ -45,20 +43,59 @@ public:
     static constexpr std::uint_fast64_t A13 {1ULL << 13ULL};
     static constexpr std::uint_fast64_t A14 {1ULL << 14ULL};
     static constexpr std::uint_fast64_t A15 {1ULL << 15ULL};
-    static constexpr std::uint_fast64_t INTA {1ULL << 16ULL};   // D0
-    static constexpr std::uint_fast64_t WO {1ULL << 17ULL};     // D1
-    static constexpr std::uint_fast64_t STACK {1ULL << 18ULL};  // D2
-    static constexpr std::uint_fast64_t HLTA {1ULL << 19ULL};   // D3
-    static constexpr std::uint_fast64_t OUT {1ULL << 20ULL};    // D4
-    static constexpr std::uint_fast64_t M1 {1ULL << 21ULL};     // D5
-    static constexpr std::uint_fast64_t INP {1ULL << 22ULL};    // D6
-    static constexpr std::uint_fast64_t MEMR {1ULL << 23ULL};   // D7
+
+    // D0 - Acknowledge signal for INTERRUPT request. Signal should be used to gate a restart instruction onto the data
+    //      bus when DBIN is active.
+    static constexpr std::uint_fast64_t INTA {1ULL << 16ULL};
+
+    // D1 - Indicates that the operation in the current machine cycle will be a WRITE memory or OUTPUT function (WO = 0).
+    //      Otherwise a READ memory or INPUT operation will be executed.
+    static constexpr std::uint_fast64_t WO {1ULL << 17ULL};
+
+    // D2 - Indicates that the address bus holds the pushdown stack address from the Stack Pointer.
+    static constexpr std::uint_fast64_t STACK {1ULL << 18ULL};
+
+    // D3 - Acknowledge signal for HALT instruction.
+    static constexpr std::uint_fast64_t HLTA {1ULL << 19ULL};
+
+    // D4 - Indicates that the address bus contains the address of an output device and the data bus will contain the
+    //      output data when WR is active.
+    static constexpr std::uint_fast64_t OUT {1ULL << 20ULL};
+
+    // D5 - Provides a signal to indicate that the CPU is in the fetch cycle for the first byte of an instruction.
+    static constexpr std::uint_fast64_t M1 {1ULL << 21ULL};
+
+    // D6 - Indicates that the address bus contains the address of an input device and the input data should be placed
+    //      on the data bus when DBIN is active.
+    static constexpr std::uint_fast64_t INP {1ULL << 22ULL};
+
+    // D7 - Designates that the data bus will be used for memory read data.
+    static constexpr std::uint_fast64_t MEMR {1ULL << 23ULL};
+
+    // Internal interrupt enabled pin
     static constexpr std::uint_fast64_t INTE {1ULL << 24ULL};
+
+    // Output control signal indicating that the processor is ready to accept data on the data bus
     static constexpr std::uint_fast64_t DBIN {1ULL << 25ULL};
+
+    // Output control signal indicating that processor has loaded data onto the data bus to be written at location
+    // on address bus
     static constexpr std::uint_fast64_t WR {1ULL << 26ULL};
+
+    // Output control signal indicating the process is in the first state of a given machine cycle
     static constexpr std::uint_fast64_t SYNC {1ULL << 27ULL};
+
+    // Output control signal indicating the process is currently waiting on an external device
     static constexpr std::uint_fast64_t WAIT {1ULL << 28ULL};
+
+    // Input control signal, set high to indicate an interrupt to the processor. The next cycle will then have the
+    // INTA pin active and the program counter will not be incremented. External devices should notice the INTA pin is
+    // active and take appropriate steps. Intended to be used with RST n instruction.
     static constexpr std::uint_fast64_t INT {1ULL << 29ULL};
+
+    // Input control signal, set low to prior to the T3 state to tell the processor to wait. The processor will then
+    // enter the wait state at the end of T2, where it will remain until the READY line is pulled high. Intended to
+    // be used with coordinating data reads/writes.
     static constexpr std::uint_fast64_t READY {1ULL << 30ULL};
 
     // register name constants
@@ -76,86 +113,104 @@ public:
     static constexpr std::uint8_t SP {3U};
     static constexpr std::uint8_t WZ {4U};
 
-    // bus constants
+    // 16-bit one-directional address bus
     static constexpr std::uint_fast64_t abus {0xFFFFULL};
+
+    // 8-bit bi-directional data bus
     static constexpr std::uint_fast64_t dbus {0xFF0000ULL};
 
-    // TODO: fill in doc comments
     /**
+     * Should be run in the main loop. Steps the processor one state forward. Each instruction consists of 1-5 machine
+     * cycles and 3-5 states (T1-T5) constitute a machine cycle. A full instruction cycle requires anywhere from 4-18
+     * states for its completion.
      *
+     * - The processor will announce what it needs on its pins. It's up to you to load the data bus with correct data.
+     * - Status member variable holds the current cycle type.
+     * - You can detect the start of a new instruction when both M1 and SYNC pins are active.
+     * - For more information on instructions see Intel 8080 user manual.
      */
     void tick();
 
     /**
-     *
+     * Restores the processor's internal program counter to zero, and the cpu will begin the next cycle from T1. Note,
+     * however, that this has no effect on status flags, or on any of the processor's working registers
      */
-    void reset() { pc = step_ = 0; stopped = false; }
+    void reset() { pc = step_ = 0; pins = 0ULL | READY; stopped_ = intff_ = intWhileHalt_ = false;  }
 
     /**
-     *
-     * @param val
+     * Overloaded function to prevent a common bug. The data bus pins are bits 16-24. This function left-shifts a byte
+     * the correct amount to set the pins.
+     * @param val a byte to set the data bus to
      */
     void setDBus(std::uint_fast8_t val) { pins = (pins & ~dbus) | (val << 16ULL); }
 
     /**
-     *
-     * @param val
+     * For setting the data bus pins with the named data bus pin constants defined above (D0-D7).
+     * @param val a 64-bit number to set the data bus to
      */
     void setDBus(std::uint_fast64_t val) { pins = (pins & ~dbus) | val; }
 
     /**
-     *
-     * @return
+     * Read the bits on the address bus.
+     * @return the current value of the address bus
      */
     [[nodiscard]] std::uint16_t getABus() const { return pins & abus; }
 
     /**
-     *
-     * @return
+     * Read the bits on the data bus.
+     * @return a byte representing the current value of the data bus
      */
     [[nodiscard]] std::uint8_t getDBus() const { return (pins & dbus) >> 16ULL; }
 
     /**
-     *
-     * @return
-     */
-    [[nodiscard]] std::uint8_t cy() const { return f_ & carryBit; }
-
-    /**
-     *
-     * @return
-     */
-    [[nodiscard]] std::uint8_t p() const { return (f_ & parityBit) >> 2U; }
-
-    /**
-     *
-     * @return
-     */
-    [[nodiscard]] std::uint8_t ac() const { return (f_ & auxiliaryBit) >> 4U; }
-
-    /**
-     *
-     * @return
+     * If the result of an instruction has the value 0, this flag is set; otherwise it is reset.
+     * @return 1 if the zero flag is set; 0 otherwise
      */
     [[nodiscard]] std::uint8_t z() const { return (f_ & zeroBit) >> 6U; }
 
     /**
-     *
-     * @return
+     * If the modulo 2 sum of the bits of the result of the operation is 0, (i.e., if the result has even parity),
+     * this flag is set; otherwise it is reset (i.e., if the result has odd parity).
+     * @return 1 if the sign flag is set; 0 otherwise
      */
     [[nodiscard]] std::uint8_t s() const { return (f_ & signBit) >> 7U; }
 
     /**
+     * If the most significant bit of the result of the operation has the value 1, this flag is set; otherwise it is
+     * reset.
+     * @return 1 if parity flag is set; 0 otherwise
+     */
+    [[nodiscard]] std::uint8_t p() const { return (f_ & parityBit) >> 2U; }
+
+    /**
+     * If the instruction resulted in a carry (from addition), or a borrow (from subtraction or a comparison) out of the
+     * high-order bit, this flag is set; otherwise it is reset.
+     * @return 1 if carry flag is set; 0 otherwise
+     */
+    [[nodiscard]] std::uint8_t cy() const { return f_ & carryBit; }
+
+    /**
+     * Auxiliary Carry: If the instruction caused a carry out of bit 3 and into bit 4 of the resulting value, the
+     * auxiliary carry is set; otherwise it is reset.
      *
-     * @param
-     * @return
+     * This flag is affected by single precision additions, subtractions, increments, decrements, comparisons, and
+     * logical operations, but is principally used with additions and increments preceding a DAA
+     * (Decimal Adjust Accumulator) instruction.
+     * @return 1 if the auxiliary carry flag is set; 0 otherwise
+     */
+    [[nodiscard]] std::uint8_t ac() const { return (f_ & auxiliaryBit) >> 4U; }
+
+    /**
+     * For getting the value of a register based on register symbol names.
+     * @param r a constant representing the register to get (see comment register name constants)
+     * @return the value of the register
      */
     [[nodiscard]] std::uint8_t getReg(std::uint8_t) const;
 
     /**
-     *
-     * @param rp
-     * @return
+     * For getting the value of a register pair based on register pair symbol names
+     * @param rp a constant representing the register to get (see comment register name constants)
+     * @return the value of the register pair
      */
     [[nodiscard]] std::uint16_t getPair(const std::uint8_t rp) const { return pair_[rp]; }
 
@@ -174,27 +229,27 @@ public:
      * 10001010: Halt Acknowledge
      * 00101011: Interrupt Acknowledge While Halted
      */
-    std::uint8_t status {0};
+    std::uint8_t status {0U};
 
     // the cpu's pins (see pinout at top of header file)
-    std::uint_fast64_t pins {0 | READY};
+    std::uint_fast64_t pins {0ULL | READY};
 
     // pointer to internal instruction register for debugging
     const std::uint8_t& ir {ir_};
 private:
     // flag bit constants
-    static constexpr std::uint8_t signBit {0b10000000U};
     static constexpr std::uint8_t zeroBit {0b01000000U};
-    static constexpr std::uint8_t auxiliaryBit {0b00010000U};
+    static constexpr std::uint8_t signBit {0b10000000U};
     static constexpr std::uint8_t parityBit {0b00000100U};
     static constexpr std::uint8_t carryBit {0b00000001U};
+    static constexpr std::uint8_t auxiliaryBit {0b00010000U};
 
     // set flag functions
-    void setSignFlag(const bool enabled) { enabled ? f_ |= signBit : f_ &= ~signBit; }
-    void setZeroFlag(const bool enabled) { enabled ? f_ |= zeroBit : f_ &= ~zeroBit; }
-    void setAuxCarryFlag(const bool enabled) { enabled ? f_ |= auxiliaryBit : f_ &= ~auxiliaryBit; }
-    void setParityFlag(const bool enabled) { enabled ? f_ |= parityBit : f_ &= ~parityBit; }
-    void setCarryFlag(const bool enabled) { enabled ? f_ |= carryBit : f_ &= ~carryBit; }
+    void setZeroFlag_(const bool enabled) { enabled ? f_ |= zeroBit : f_ &= ~zeroBit; }
+    void setSignFlag_(const bool enabled) { enabled ? f_ |= signBit : f_ &= ~signBit; }
+    void setParityFlag_(const bool enabled) { enabled ? f_ |= parityBit : f_ &= ~parityBit; }
+    void setCarryFlag_(const bool enabled) { enabled ? f_ |= carryBit : f_ &= ~carryBit; }
+    void setAuxCarryFlag_(const bool enabled) { enabled ? f_ |= auxiliaryBit : f_ &= ~auxiliaryBit; }
 
     // symbol functions (see ch4 intel 8080 data sheet)
     [[nodiscard]] std::uint8_t rp_() const { return (ir_ & 0b110000U) >> 4U; }
@@ -205,14 +260,13 @@ private:
     [[nodiscard]] bool ccc_() const;
 
     // common pin manipulation functions
-    void setABus(std::uint16_t val) { pins = pins & ~0xFFFFULL | val; }
-    void stopDataIn() { pins &= ~DBIN; }
-    void stopDataOut() { pins &= ~WR; }
+    void setABus_(std::uint16_t val) { pins = pins & ~0xFFFFULL | val; }
+    void stopDataIn_() { pins &= ~DBIN; }
+    void stopDataOut_() { pins &= ~WR; }
     [[nodiscard]] bool waiting_() const { return pins & WAIT; }
-    [[nodiscard]] bool interrupted_() const { return (pins & INT) != 0 and pins & INTE; }
 
     // helper functions
-    void setReg(std::uint8_t, std::uint8_t);
+    void setReg_(std::uint8_t, std::uint8_t);
     void setHi_(const std::uint8_t rp, std::uint8_t val) { pair_[rp] = (pair_[rp] & 0x00FF) | (val << 8U); }
     void setLo_(const std::uint8_t rp, std::uint8_t val) { pair_[rp] = (pair_[rp] & 0xFF00) | val; }
     [[nodiscard]] static std::uint8_t hi_(const std::uint16_t val) { return (val & 0xFF00) >> 8U; }
@@ -221,7 +275,6 @@ private:
     // state functions
     void t1_(); // ONLY TO BE CALLED AFTER setDBus() CALL
     void t2_();;
-    void fetchT1_();
     void readT1_(std::uint16_t);
     void writeT1_(std::uint16_t);
     void stackWriteT1_();
@@ -234,27 +287,29 @@ private:
     void writeT2_(std::uint8_t);
 
     // arithmetic & logical functions
-    void add(std::uint8_t);
-    void adc(std::uint8_t);
-    void sub(std::uint8_t);
-    void sbb(std::uint8_t);
-    std::uint8_t inr(std::uint8_t);
-    std::uint8_t dcr(std::uint8_t);
-    void ana(std::uint8_t);
-    void ani(std::uint8_t);
-    void xra(std::uint8_t);
-    void ora(std::uint8_t);
-    void cmp(std::uint8_t);
+    void add_(std::uint8_t);
+    void adc_(std::uint8_t);
+    void sub_(std::uint8_t);
+    void sbb_(std::uint8_t);
+    std::uint8_t inr_(std::uint8_t);
+    std::uint8_t dcr_(std::uint8_t);
+    void ana_(std::uint8_t);
+    void ani_(std::uint8_t);
+    void xra_(std::uint8_t);
+    void ora_(std::uint8_t);
+    void cmp_(std::uint8_t);
 
     // flag helper functions
-    void carryFlagsAlg();
-    void carryFlagsAnd(std::uint8_t);
-    void carryFlagsAdd(std::uint8_t, std::uint8_t cy=0);
-    void carryFlagsSub(std::uint8_t, std::uint8_t cy=0);
-    void zspFlags(std::uint8_t);
+    void carryFlagsAlg_();
+    void carryFlagsAnd_(std::uint8_t);
+    void carryFlagsAdd_(std::uint8_t, std::uint8_t cy= 0);
+    void carryFlagsSub_(std::uint8_t, std::uint8_t cy= 0);
+    void zspFlags_(std::uint8_t);
 
     std::uint16_t step_ {0};
-    bool stopped {false};
+    bool stopped_ {false};
+    bool intWhileHalt_ {false};
+    bool intff_ {false};
 
     // registers
     std::uint8_t ir_ {0}, tmp_ {0};
