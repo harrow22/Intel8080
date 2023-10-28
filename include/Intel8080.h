@@ -23,6 +23,18 @@
  *   A14 ○<————│ 15             17 │<———>○ D0
  *   A15 ○<————│ 16                │
  *             └───────────────────┘
+ *
+ * The processor will announce what it needs on its pins every state. It expects external devices to notice this and
+ * respond correctly. For example,
+ *      - In a read cycle (when DBIN is active) you should load the data bus with data.
+ *      - In a write cycle (when WR is active) you should store the data on the data bus at the location on the address
+ *        bus.
+ *
+ * The only place my emulator "cheats" is by not overlapping certain instructions with the next fetch/decode cycle.
+ * Instead, the overlapping portion is handled in the last state of that instruction. Also, I'm not emulating the
+ * two-phase clock.
+ *
+ * For more information on individual instructions see chapter 4 of the Intel 8080 user manual.
  */
 class Intel8080 {
 public:
@@ -83,6 +95,7 @@ public:
     static constexpr std::uint_fast64_t WR {1ULL << 26ULL};
 
     // Output control signal indicating the process is in the first state of a given machine cycle
+    // You can detect the start of a new instruction when both M1 and SYNC pins are active.
     static constexpr std::uint_fast64_t SYNC {1ULL << 27ULL};
 
     // Output control signal indicating the process is currently waiting on an external device
@@ -90,12 +103,13 @@ public:
 
     // Input control signal, set high to indicate an interrupt to the processor. The next cycle will then have the
     // INTA pin active and the program counter will not be incremented. External devices should notice the INTA pin is
-    // active and take appropriate steps. Intended to be used with RST n instruction.
+    // active and take appropriate steps. Intended to be used with RST n instruction. This pin will *not* be cleared
+    // internally.
     static constexpr std::uint_fast64_t INT {1ULL << 29ULL};
 
     // Input control signal, set low to prior to the T3 state to tell the processor to wait. The processor will then
     // enter the wait state at the end of T2, where it will remain until the READY line is pulled high. Intended to
-    // be used with coordinating data reads/writes.
+    // be used with coordinating data reads/writes. This pin will *not* be cleared internally.
     static constexpr std::uint_fast64_t READY {1ULL << 30ULL};
 
     // register name constants
@@ -120,14 +134,11 @@ public:
     static constexpr std::uint_fast64_t dbus {0xFF0000ULL};
 
     /**
-     * Should be run in the main loop. Steps the processor one state forward. Each instruction consists of 1-5 machine
-     * cycles and 3-5 states (T1-T5) constitute a machine cycle. A full instruction cycle requires anywhere from 4-18
-     * states for its completion.
+     * Steps the processor one state forward. Each instruction consists of 1-5 machine cycles and 3-5 states (T1-T5)
+     * constitute a machine cycle. A full instruction cycle requires anywhere from 4-18 states for its completion.
      *
-     * - The processor will announce what it needs on its pins. It's up to you to load the data bus with correct data.
-     * - Status member variable holds the current cycle type.
-     * - You can detect the start of a new instruction when both M1 and SYNC pins are active.
-     * - For more information on instructions see Intel 8080 user manual.
+     * If you want more information on how exactly this function works, see the timing charts and individual instruction
+     * state charts in chapter 2 of the Intel 8080 user manual.
      */
     void tick();
 

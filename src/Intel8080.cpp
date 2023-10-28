@@ -1,6 +1,7 @@
 #include "../include/Intel8080.h"
 
 #include <vector>
+#include <bit>
 
 constexpr int mnemonic[72] {
         3, // MOV r1, r2
@@ -494,8 +495,6 @@ void Intel8080::tick()
             goto done;
         }
 
-
-        // my emulator cheats by not overlapping instructions with the next fetch/decode cycle
         // ADD r
         case 88:
             add_(getReg(src_()));
@@ -736,7 +735,7 @@ void Intel8080::tick()
             --pair_[rp_()];
             goto done;
 
-        // DAD (cheating by using integers)
+        // DAD
         case 146: case 147: case 148: case 149: case 150: case 151: goto next;
         case 152: {
             setCarryFlag_(pair_[HL] + pair_[rp_()] > 0xFFFF);
@@ -1672,9 +1671,6 @@ inline void Intel8080::writeT2_(const std::uint8_t r)
     setDBus(r);
 }
 
-// forward declaring flag helper function
-bool parityOf(std::uint8_t x);
-
 inline void Intel8080::add_(const std::uint8_t addend)
 {
     carryFlagsAdd_(addend);
@@ -1784,14 +1780,5 @@ inline void Intel8080::zspFlags_(const std::uint8_t val)
 {
     setZeroFlag_(val == 0);
     setSignFlag_(val & 0x80U);
-    setParityFlag_(parityOf(val));
+    setParityFlag_(std::popcount(val) % 2 == 0);
 }
-
-bool parityOf(std::uint8_t x)
-{
-    x ^= x >> 4U;
-    x ^= x >> 2U;
-    x ^= x >> 1U;
-    return !(x & 1U);
-}
-
