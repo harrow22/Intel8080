@@ -79,9 +79,15 @@ void log (Intel8080& intel8080, const Memory& memory, unsigned long long current
 int loadFile(Memory& memory, const std::string& path, int addr)
 {
     std::ifstream file {path, std::ios::binary};
-    if (!file) {
-        std::cerr << std::format("error: can't open file '{:s}'.\n", path);
+
+    if (file.fail()) {
+        std::cerr << std::format("error: failure when opening file '{:s}'.\n", path);
         return -1;
+    }
+
+    if (!file.is_open()) {
+        std::cerr << std::format("error: can't open file '{:s}'. Ensure you're in the correct directory: 'Intel8080/'.\n", path);
+        return -2;
     }
     file.read(reinterpret_cast<char*>(&memory[addr]), memory.size());
 
@@ -125,7 +131,7 @@ void onDataInput(Intel8080& intel8080, Memory& memory, bool debug, bool verbose)
     } else if (intel8080.status == MachineCycle::inputRead) {
         intel8080.setDBus(0ULL);
     } else {
-        std::cout << std::format("error: unrecognized status word with DBIN pin high '{:b}' - {:s}\n",
+        std::cout << std::format("ERROR: unrecognized status word with DBIN pin high '{:b}' - {:s}\n",
                                  intel8080.status, disassambleTable[intel8080.ir]);
     }
 }
@@ -159,7 +165,7 @@ void onDataOutput(Intel8080& intel8080, Memory& memory, bool debug, bool verbose
             }
         }
     } else {
-        std::cout << std::format("error: unrecognized status word with WR pin high '{:b}' - {:s}\n",
+        std::cout << std::format("ERROR: unrecognized status word with WR pin high '{:b}' - {:s}\n",
                                  intel8080.status, disassambleTable[intel8080.ir]);
     }
 }
