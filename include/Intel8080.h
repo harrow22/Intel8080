@@ -112,6 +112,18 @@ public:
     // be used with coordinating data reads/writes. This pin will *not* be cleared internally.
     static constexpr std::uint_fast64_t READY {1ULL << 30ULL};
 
+    // possible instruction cycle constants
+    static constexpr  std::uint8_t instructionFetch {0b10100010U};
+    static constexpr  std::uint8_t memoryRead {0b10000010U};
+    static constexpr  std::uint8_t memoryWrite {0b00000000U};
+    static constexpr  std::uint8_t stackRead {0b10000110U};
+    static constexpr  std::uint8_t stackWrite {0b00000100U};
+    static constexpr  std::uint8_t inputRead {0b01000010U};
+    static constexpr  std::uint8_t outputWrite {0b00010000U};
+    static constexpr  std::uint8_t interruptAck {0b00100011U};
+    static constexpr  std::uint8_t haltAck {0b10001010U};
+    static constexpr  std::uint8_t interruptAckWhileHalt {0b00101011U};
+
     // register name constants
     static constexpr std::uint8_t B {0U};
     static constexpr std::uint8_t C {1U};

@@ -7,18 +7,6 @@
 #include "Intel8080.h"
 
 using Memory = std::array<std::uint8_t, 0x10000>;
-namespace MachineCycle {
-    static constexpr  std::uint8_t instructionFetch {0b10100010U};
-    static constexpr  std::uint8_t memoryRead {0b10000010U};
-    static constexpr  std::uint8_t memoryWrite {0b00000000U};
-    static constexpr  std::uint8_t stackRead {0b10000110U};
-    static constexpr  std::uint8_t stackWrite {0b00000100U};
-    static constexpr  std::uint8_t inputRead {0b01000010U};
-    static constexpr  std::uint8_t outputWrite {0b00010000U};
-    static constexpr  std::uint8_t interruptAck {0b00100011U};
-    static constexpr  std::uint8_t haltAck {0b10001010U};
-    static constexpr  std::uint8_t interruptAckWhileHalt {0b00101011U};
-}
 
 static constexpr std::string testDirectory {"tests/binaries/"};
 static constexpr std::string disassambleTable[256] = {
@@ -112,7 +100,7 @@ std::string t(std::chrono::steady_clock::time_point begin, std::chrono::steady_c
 
 void onDataInput(Intel8080& intel8080, Memory& memory, bool debug, bool verbose)
 {
-    if (intel8080.status == MachineCycle::instructionFetch) {
+    if (intel8080.status == Intel8080::instructionFetch) {
         intel8080.setDBus(memory[intel8080.getABus()]);
         if (debug and verbose)
             std::cout << std::format(
@@ -120,7 +108,7 @@ void onDataInput(Intel8080& intel8080, Memory& memory, bool debug, bool verbose)
                     disassambleTable[memory[intel8080.getABus()]],
                     intel8080.getABus(),
                     intel8080.getDBus());
-    } else if (intel8080.status == MachineCycle::memoryRead or intel8080.status == MachineCycle::stackRead) {
+    } else if (intel8080.status == Intel8080::memoryRead or intel8080.status == Intel8080::stackRead) {
         intel8080.setDBus(memory[intel8080.getABus()]);
         if (debug and verbose)
             std::cout << std::format(
@@ -128,7 +116,7 @@ void onDataInput(Intel8080& intel8080, Memory& memory, bool debug, bool verbose)
                     disassambleTable[intel8080.ir],
                     intel8080.getABus(),
                     intel8080.getDBus());
-    } else if (intel8080.status == MachineCycle::inputRead) {
+    } else if (intel8080.status == Intel8080::inputRead) {
         intel8080.setDBus(0ULL);
     } else {
         std::cout << std::format("ERROR: unrecognized status word with DBIN pin high '{:b}' - {:s}\n",
@@ -138,7 +126,7 @@ void onDataInput(Intel8080& intel8080, Memory& memory, bool debug, bool verbose)
 
 void onDataOutput(Intel8080& intel8080, Memory& memory, bool debug, bool verbose)
 {
-    if (intel8080.status == MachineCycle::memoryWrite or intel8080.status == MachineCycle::stackWrite) {
+    if (intel8080.status == Intel8080::memoryWrite or intel8080.status == Intel8080::stackWrite) {
         memory[intel8080.getABus()] = intel8080.getDBus();
         if (debug and verbose)
             std::cout << std::format(
@@ -147,7 +135,7 @@ void onDataOutput(Intel8080& intel8080, Memory& memory, bool debug, bool verbose
                     intel8080.getABus(),
                     intel8080.getDBus(),
                     memory[intel8080.getABus()]);
-    } else if (intel8080.status == MachineCycle::outputWrite) {
+    } else if (intel8080.status == Intel8080::outputWrite) {
         std::uint16_t port{intel8080.getABus()};
         if (port == 0) {
             testRunning = false;
@@ -199,7 +187,7 @@ void test(Intel8080& intel8080, const std::string& testName, unsigned long long 
         intel8080.tick();
         ++executedCycles;
 
-        if (intel8080.pins & Intel8080::SYNC and intel8080.status == MachineCycle::instructionFetch) {
+        if (intel8080.pins & Intel8080::SYNC and intel8080.status == Intel8080::instructionFetch) {
             ++instructions;
             if (debug)
                 log(intel8080, memory, executedCycles);
