@@ -100,7 +100,12 @@ constexpr int opcode[256] {
 void Intel8080::tick()
 {
     if (pins & INT and pins & INTE) {
+        intreq_ = true;
+    }
+    if (intreq_ and step_ == 0) {
+        // ensure intff latched AFTER the last instruction has completed execution
         intff_ = true;
+        intreq_ = false;
         if (stopped_) {
             stopped_ = false;
             intWhileHalt_ = true;
@@ -1249,7 +1254,7 @@ void Intel8080::tick()
             if (waiting_()) goto wait;
             else {
                 stopDataOut_();
-                pair_[WZ] = nnn_() * 8U;
+                pair_[WZ] = nnn_();
                 pc = pair_[WZ];
                 goto done;
             }

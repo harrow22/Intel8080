@@ -278,7 +278,7 @@ private:
     [[nodiscard]] std::uint8_t rp_() const { return (ir_ & 0b110000U) >> 4U; }
     [[nodiscard]] std::uint8_t dst_() const { return (ir_ & 0b111000U) >> 3U; }
     [[nodiscard]] std::uint8_t src_() const { return ir_ & 0b111U; }
-    [[nodiscard]] std::uint8_t nnn_() const { return (ir_ & 0b111000) >> 3U; }
+    [[nodiscard]] std::uint8_t nnn_() const { return ir_ & 0b111000; }
     [[nodiscard]] std::uint8_t psw_() const { return f_; }
     [[nodiscard]] bool ccc_() const;
 
@@ -332,7 +332,7 @@ private:
     std::uint16_t step_ {0};
     bool stopped_ {false};
     bool intWhileHalt_ {false};
-    bool intff_ {false};
+    bool intff_ {false}, intreq_ {false};
 
     // registers
     std::uint8_t ir_ {0}, tmp_ {0};
