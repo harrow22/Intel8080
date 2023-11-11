@@ -1,7 +1,7 @@
 # Intel8080 Emulator
 Project to develop as close to cycle-accurate of an Intel 8080 emulator as I can. It passes the full test suite found [here](https://altairclone.com/downloads/cpu_tests/). 
 
-I created this mainly for use with my (future) [Space Invaders](https://en.wikipedia.org/wiki/Space_Invaders) project and emulator development experience in general. Also to learn how to create a basic c++ library. 
+I created this for use with my [Space Invaders emulator](https://github.com/harrow22/SpaceInvaders).
 
 ## Usage
 ### Dependencies
@@ -15,9 +15,9 @@ Using CMake's `FetchContent`, add this to your CMakeLists.txt file:
 include(FetchContent)
 FetchContent_Declare(
         Intel8080
-        INTEL8080_TESTS OFF
         GIT_REPOSITORY "https://github.com/harrow22/Intel8080.git"
 )
+set(INTEL8080_TESTS OFF)
 FetchContent_MakeAvailable(Intel8080)
 ```
 Then you can just link it to your executable using `target_link_libraries`.
@@ -28,11 +28,11 @@ See [header file](include/Intel8080.h)
 ## Running Tests
 ### With CMake
 ```
-$ git clone https://github.com/harrow22/Intel8080.git
-$ cd Intel8080/
-$ cmake -S . -B build -G your_generator -DCMAKE_BUILD_TYPE=RELEASE
-$ cmake --build build
-$ build/tests/Intel8080_test.exe <ARGUMENTS>...
+git clone https://github.com/harrow22/Intel8080.git
+cd Intel8080/
+cmake -S . -B build -G your_generator -DCMAKE_BUILD_TYPE=RELEASE
+cmake --build build --config Release
+build/tests/Intel8080_test.exe <ARGUMENTS>...
 ```
 
 By default, it will write output to stdout. Running it on my i5-8250U on Windows 11 produces this,
